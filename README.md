@@ -1,4 +1,4 @@
 kv_openssl
 ==========
 
-ECDH implementation with a smaller memoryfoorptint
+EC / ECDH implementation ( based on OpenSSL ) with a smaller memory foot print
