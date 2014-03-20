@@ -683,11 +683,12 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                                 ln = qTemp.popleft()
                                                 i = 0
                                                 if ( ln.count('(') and sCount > 0 and ( cStart == cEnd ) and (not ln.startswith("//") ) and ( not ln.startswith("#") ) and not fHdr in ln ):
+                                                    regex = re.compile(r'[\n\r\t]')
+                                                    ln = regex.sub(' ', str(ln))
                                                     cleaned = clearComments(ln, True)
                                                     print cleaned
                                                     for cln in cleaned:
-                                                        print cln
-                                                        for x in cln.split("("):
+                                                        for x in str(cln).split("("):
                                                             paraList.append(x)
 
                                                     for slc in paraList:
@@ -862,6 +863,8 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                 i = 0
                                 paraList = []
                                 if ( ln.count('(') and sCount > 0 and ( cStart == cEnd ) and (not ln.startswith("//") ) and ( not ln.startswith("#") ) and not funcName in ln ):
+                                    regex = re.compile(r'[\n\r\t]')
+                                    ln = regex.sub(' ', str(ln))
                                     cleaned = clearComments(ln, True)
                                     for cln in cleaned:
                                         for x in str(cln).split("("):
@@ -971,7 +974,7 @@ def main(argv) :
     ''' Has to be the root path of the code base '''
     path = "/Volumes/work/Phd/ECDH/kv_openssl/"
     ''' Name of the looked function '''
-    functionName = "OpenSSLDie"
+    functionName = "OPENSSL_showfatal"
 
     recFuncSearch(path, functionName,".")
    # varSearch(path)
