@@ -121,6 +121,11 @@ def extractVariables(code, fList, cond ):
     cEnd = 0
     argFinding = True
     argPatterns = ["\((.*[^\)])\)", "^(.*)$", "\(?(.*)\)"]
+    templates = [ "\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*\[(.*)\][=;\s]", \
+                          "^\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_,]+)\s*;$", \
+                          "\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*=(.*[^;]);?", \
+                          "\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_,]+)\s*;"]
+                          
 
     for num in range( len(code) ):
 
@@ -169,62 +174,61 @@ def extractVariables(code, fList, cond ):
                                 tempLVariables.append(re.findall("^\s*\**\s*(.*)", item)[0])
                     i += 1
         else:
-            ''' case: type var[]; '''
-            seg = re.findall("^\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*\[(.*)\].*$", orgLine)
-            if ( not seg ):                
-                ''' case: type var; '''
-                seg = re.findall("^\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_,]+)\s*;$", orgLine)
-                if ( not seg ):        
-                    ''' case: type var = var | value ; '''
-                    seg = re.findall("^\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*=(.*[^;]);?$", orgLine)
+##            ''' case: type var[]; '''
+##            seg = re.findall("^\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*\[(.*)\].*$", orgLine)
+##            if ( not seg ):                
+##                ''' case: type var; '''
+##                seg = re.findall("^\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_,]+)\s*;$", orgLine)
+##                if ( not seg ):        
+##                    ''' case: type var = var | value ; '''
+##                    seg = re.findall("^\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*=(.*[^;]);?$", orgLine)
+##                    if ( not seg ):
+##                        ''' case: { void *p; int f*; }; '''
+##                        seg = re.findall("\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_,]+)\s*;", orgLine)
                     
-                
-            if ( seg ):
-                i = 0
-                segSplit = re.findall("\s*\((.*)\)\s*",str(seg[0]))[0].split(",")
+            for template in templates:
+                seg = re.findall(template, orgLine)
+                for x in seg:
+                    i = 0
+                    segSplit = re.findall("\s*\((.*)\)\s*",str(x))[0].split(",")
 
-                for item in segSplit:
-                    item = re.findall("^\s*'?(.*[^'])'?\s*$", item.strip())
+                    for item in segSplit:
+                        item = re.findall("^\s*'?(.*[^'])'?\s*$", item.strip())
 
-                    if item :
-                        item = clean(item[0])
-                
-                    if ( item and not ( item in tempLVariables or item in fList or item in reserveWords or item in tempVariables) ):
-                        if ( i == 0 ):
-                            tempTypes.append(item.strip())
-                        elif ( i == 1 ):
-                            subTypes = item.split()
+                        if item :
+                            item = clean(item[0])
+                    
+                        if ( item and not ( item in tempLVariables or item in fList or item in reserveWords or item in tempVariables) ):
+                            if ( i == 0 ):
+                                tempTypes.append(item.strip())
+                            elif ( i == 1 ):
+                                subTypes = item.split()
 
-                            for subType in subTypes:
-                                subType = clean(subType)
-                                if ( subType.count("*") ):
-                                    subType = re.findall("\**\s*([A-Za-z0-9_]+)\s*\**)", subType)[0]
+                                for subType in subTypes:
                                     subType = clean(subType)
-                                if ( subType and not ( subType in tempLVariables or subType in fList or subType in reserveWords or subType in tempVariables) ):
-##                                    #regex = re.compile(r'[\t]')
-##                                    #subType = regex.sub(' ', str(subType))
-##                                    print "sub "+ re.sub('[\\t]',' ', subType.split()[0])
-##                                    print "Type "+ clean(subType)
-##                                    print "Org "+ orgLine
-                                    tempTypes.append(subType)
-                                
-                        elif ( i == 2 ):
-                            tempLVariables.append(item.strip())
-                        else:
-                            rem = item
-                            ''' case: type var1 = var2; '''
-                            match = re.findall("^\s*([A-Za-z0-9_]+)\s*;?\*$", rem)
-                            if ( match and not clean(match[0]).isdigit() and not clean(match[0]) in tempVariables and not clann(match[0]) in fList):
-                                tempVariables.append(clean(match[0]))
+                                    if ( subType.count("*") ):
+                                        subType = re.findall("\**\s*([A-Za-z0-9_]+)\s*\**)", subType)[0]
+                                        subType = clean(subType)
+                                    if ( subType and not ( subType in tempLVariables or subType in fList or subType in reserveWords or subType in tempVariables) ):
+                                        tempTypes.append(subType)
+                                    
+                            elif ( i == 2 ):
+                                tempLVariables.append(item.strip())
+                            else:
+                                rem = item
+                                ''' case: type var1 = var2; '''
+                                match = re.findall("^\s*([A-Za-z0-9_]+)\s*;?\*$", rem)
+                                if ( match and not clean(match[0]).isdigit() and not clean(match[0]) in tempVariables and not clann(match[0]) in fList):
+                                    tempVariables.append(clean(match[0]))
 
-                            ''' case: type var1 = (*type)var2; '''
-                            match = re.findall("\S*\s*\(\s*\**\s*([A-Za-z0-9_]+\s*)\)[A-Za-z0-9_]+", rem)
-                            for typeM in match:
-                                typeM = clean(typeM)
-                                if ( typeM and not typeM.isdigit()and not typeM in tempTypes and not typeM in fList):
-                                    tempTypes.append(typeM)
-                                                                                               
-                    i += 1
+                                ''' case: type var1 = (*type)var2; '''
+                                match = re.findall("\S*\s*\(\s*\**\s*([A-Za-z0-9_]+\s*)\)[A-Za-z0-9_]+", rem)
+                                for typeM in match:
+                                    typeM = clean(typeM)
+                                    if ( typeM and not typeM.isdigit()and not typeM in tempTypes and not typeM in fList):
+                                        tempTypes.append(typeM)
+                                                                                                   
+                        i += 1
 
             ''' case: (*type) var op (type) var'''
             seg = re.findall("\S*\s*\(\s*\**\s*([A-Za-z0-9_]+\s*)\)[A-Za-z0-9_]+", orgLine)
@@ -561,10 +565,6 @@ def recFuncSearch(rootPath, funcName, rootFile):
                         sCount += orgLine.count('{');
                         eCount += orgLine.count('}');
 
-##                        if len( re.findall("^.*struct.*\{.*$", line) ) :
-##                            insSturct += 1
-##                            sCount -= sCount
-
                         if len( re.findall("^.*extern.*\{.*$", line) ):
                             sCount -= sCount
 
@@ -586,7 +586,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                 fDeclaration.append(orgLine)
 
                                 while ( not stripped(line).endswith(";") ):  
-                                    line = inF.next();
+                                    line = inF.next()
                                     print line,
                                     fDeclaration.append(line)
 
@@ -637,7 +637,8 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                                     for slc in paraList:
                                                         slc = slc.split()[ len( slc.split() ) - 1 ]
                                                         slc = cleanFunctionName(slc)
-                                                        if ( slc != funcName and i < seg.count("(") ):
+                                                        slc = clean(slc)
+                                                        if ( slc and slc != funcName and i < seg.count("(") ):
                                                             if(  len (re.findall("[^=\+\?\.\*\^\$\(\)\[\]\{\}\|\\!@#%&\"\'/\s\-<>:;`]", slc.strip())) == len(slc.strip())):
                                                                 fList.append(slc)
                                                         i += 1
@@ -695,7 +696,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                             for i in range( len(qTemp) ):
                                                 ln = qTemp.popleft()
                                                 i = 0
-                                                if ( ln.count('(') and sCount > 0 and ( cStart == cEnd ) and (not ln.startswith("//") ) and ( not ln.startswith("#") ) and not fHdr in ln ):
+                                                if ( ln.count('(') and sCount > 0 and ( cStart == cEnd ) and (not ln.startswith("//") ) and ( not ln.startswith("#") ) ):
                                                     regex = re.compile(r'[\n\r\t]')
                                                     ln = regex.sub(' ', str(ln))
                                                     cleaned = clearComments(ln, True)
@@ -708,7 +709,8 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                                         if ( slc.strip() ):
                                                             slc = slc.split()[ len( slc.split() ) - 1 ]
                                                             slc = cleanFunctionName(slc)
-                                                            if ( slc != funcName and i < ln.count("(") ):
+                                                            slc = clean(slc)
+                                                            if ( slc and slc != funcName and i < ln.count("(") ):
                                                                 if(  len (re.findall("[^=\+\?\.\*\^\$\(\)\[\]\{\}\|\\!@#%&\"\'/\s\-<>:;`]", slc.strip())) == len(slc.strip())):
                                                                     fList.append(slc)
                                                         i += 1
@@ -875,7 +877,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                 ''' Looking for possible function calls within the function body ''' 
                                 i = 0
                                 paraList = []
-                                if ( ln.count('(') and sCount > 0 and ( cStart == cEnd ) and (not ln.startswith("//") ) and ( not ln.startswith("#") ) and not funcName in ln ):
+                                if ( ln.count('(') and sCount > 0 and ( cStart == cEnd ) and (not ln.startswith("//") ) and ( not ln.startswith("#") ) ):
                                     regex = re.compile(r'[\n\r\t]')
                                     ln = regex.sub(' ', str(ln))
                                     cleaned = clearComments(ln, True)
@@ -887,8 +889,9 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                         if ( slc.strip() ):
                                             slc = slc.split()[ len( slc.split() ) - 1 ]
                                             slc = cleanFunctionName(slc)
-                                            if ( slc != fHdrCln and i < ln.count("(") ):
-                                                if(  len (re.findall("[^=\+\?\.\*\^\$\(\)\[\]\{\}\|\\!@#%&\"\'/\s\-<>:;`]", slc.strip())) == len(slc.strip())):
+                                            slc = clean(slc)
+                                            if ( slc != funcName and i < ln.count("(") ):
+                                                if( slc and  len (re.findall("[^=\+\?\.\*\^\$\(\)\[\]\{\}\|\\!@#%&\"\'/\s\-<>:;`]", slc.strip())) == len(slc.strip())):
                                                     fList.append(slc)
                                         i += 1
                                  
