@@ -339,8 +339,6 @@ def varSearch(rootPath):
                                 mcrCount -= 1
                                 temp = ""
 
-                                #print preProcessorQ
-
                                 skip = False
                                 if ( len(preProcessorQ)): 
                                     temp = preProcessorQ.pop()
@@ -362,6 +360,8 @@ def varSearch(rootPath):
 
                                 if ( not mcrCount ):
                                     if ( found ):
+                                        print orgLine
+                                        print preProcessorQ
                                         for i in range( len(preProcessorQ) ):
                                             dDefinition.append(preProcessorQ.popleft())
                                         found = False
@@ -381,12 +381,12 @@ def varSearch(rootPath):
                                 preProcessorQ.append(orgLine)
                                 continue
                             
-                            elif ( re.findall('^\s*#\s*include.*', orgLine) ):
-                                if ( mcrCount ):
-                                    preProcessorQ.append(orgLine)
-                                else:
-                                    dDefinition.append(orgLine)
-                                continue
+##                            elif ( re.findall('^\s*#\s*include.*', orgLine) ):
+##                                if ( mcrCount ):
+##                                    preProcessorQ.append(orgLine)
+##                                else:
+##                                    dDefinition.append(orgLine)
+##                                continue
                             
 ##                            elif ( re.findall('^\s*#\s*define.*$', orgLine) ):
 ##                                if ( mcrCount ):
@@ -394,18 +394,24 @@ def varSearch(rootPath):
 ##                                else:
 ##                                    dDefinition.append(orgLine)
 ##                                continue
-
-                            elif ( re.findall('^\s*#\s*error.*$', orgLine) ):
-                                if ( mcrCount ):
-                                    preProcessorQ.append(orgLine)
-                                else:
-                                    dDefinition.append(orgLine)
-                                continue
+##
+##                            elif ( re.findall('^\s*#\s*error.*$', orgLine) ):
+##                                if ( mcrCount ):
+##                                    preProcessorQ.append(orgLine)
+##                                else:
+##                                    dDefinition.append(orgLine)
+##                                continue
       
                         if ( re.findall("^\s*#\s*define\s+([A-Za-z0-9_]+)\s+[A-Za-z0-9_]+\s*.*$", orgLine) ):
                             name = re.findall("^\s*#\s*define\s*([A-Za-z0-9_]*)\s+[A-Za-z0-9_]+\s*.*$", orgLine)[0].strip()
                             if ( name in gVariable or name in cDefinition ):
                                 tempCode.append(orgLine)
+                                found = True
+
+                                if ( mcrCount ):
+                                    preProcessorQ.append(orgLine)
+                                else:
+                                    dDefinition.append(orgLine)
 
                                 while ( stripped(orgLine).endswith("\\") ):
                                     orgLine = inF.next()
@@ -418,7 +424,9 @@ def varSearch(rootPath):
 
                                 extractVariables(tempCode, [], False)
 
+                                print "f "+str(preProcessorQ)
                                 print "Found :"+name
+                                print "f "+str(mcrCount)
 
 ##                                if ( name in gVariable ):
 ##                                    gVariable.remove(name)
@@ -519,6 +527,7 @@ def varSearch(rootPath):
         if ( not ( len(gVariable) or len(cDefinition) ) ):
             break
 
+    print str(preProcessorQ)
                             
 def recFuncSearch(rootPath, funcName, rootFile):
     ''' Recursively searches for a given function name '''
@@ -1021,13 +1030,16 @@ def main(argv) :
 
  #   recFuncSearch(path, functionName,".")
     gVariable.append("ossl_ssize_t")
+    gVariable.append("OPENSSL_EXPORT")
     varSearch(path)
 
     print str(gVariable)
     print str(cDefinition)
 
+    print len(fDeclaration)
+
     ''' Writing all the header declarations '''
-    if ( len(fDeclaration) ):
+    if ( len(dDefinition) ):
         thefile = open(functionName+".h",'w')
 
         for i in range( len(dDefinition) ):
