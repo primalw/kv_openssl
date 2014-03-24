@@ -23,6 +23,7 @@ cDefinition = deque()
 dDefinition = deque()
 ''' Queue of found data definitions '''
 dFound = deque()
+fList = []
 
 reserveWords = [ "auto", "if", "break", "int", "case", "long", "char", "register", "continue", "return", "default", "short", "do", "sizeof", "double", "static", \
                         "else", "struct", "entry", "switch", "extern", "typedef", "float", "union", "for", "unsigned", "goto", "while", "enum", "void", "const", "signed", \
@@ -116,6 +117,8 @@ def extractVariables(code, fList, cond ):
     tempLVariables = deque()
     ''' All the types of variables used '''
     tempTypes = deque()
+    ''' nested ( inner ) variables used '''
+    ignoreVar = []
 
  #   print "================= Variable Extraction ================"
     i = 0
@@ -127,13 +130,14 @@ def extractVariables(code, fList, cond ):
                           "^\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_,]+)\s*;$", \
                           "\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*=(.*[^;]);?", \
                           "\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_,]+)\s*;"]
+    drefPatterns = ["[^A-Za-z0-9_]+([A-Za-z0-9_]+)->([A-Za-z0-9_]+)", "[^A-Za-z0-9_]+([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)"]
                           
-
     for num in range( len(code) ):
 
         orgLine = code.popleft().strip()
+        print orgLine
 
-        if ( re.findall("^\s*#.*$", orgLine) ):
+        if ( re.findall("^[^#\{\}/\*\s][\W]+.*$", orgLine) ):
             continue
 
         cStart += orgLine.count('/*');
@@ -209,7 +213,8 @@ def extractVariables(code, fList, cond ):
                                 for subType in subTypes:
                                     subType = clean(subType)
                                     if ( subType.count("*") ):
-                                        subType = re.findall("\**\s*([A-Za-z0-9_]+)\s*\**)", subType)[0]
+                                        print subType
+                                        subType = re.findall("\**\s*([A-Za-z0-9_]+)\s*\**", subType)[0]
                                         subType = clean(subType)
                                     if ( subType and not ( subType in tempLVariables or subType in fList or subType in reserveWords or subType in tempVariables) ):
                                         tempTypes.append(subType)
@@ -231,6 +236,26 @@ def extractVariables(code, fList, cond ):
                                         tempTypes.append(typeM)
                                                                                                    
                         i += 1
+                        
+            ''' case: pointer derefencing'''
+            for regex in drefPatterns:
+                seg = re.findall(regex, orgLine)
+                i = 0
+                for x in seg:
+                    segSplit = re.findall("\s*\((.*)\)\s*",str(x))[0].split(",")
+                    for item in segSplit:
+                        item = re.findall("^\s*'?(.*[^'])'?\s*$", item.strip())
+                        typeM = clean(item)
+                        if ( not ( i % 2 ) ):
+                            if ( typeM and not typeM.isdigit()and not typeM in tempTypes and not typeM in fList):
+                                tempTypes.append(typeM)
+                        else:
+                            if ( typeM and not typeM.isdigit()and not typeM in tempTypes ) :
+                                ignoreVar.append(typeM)
+
+                                if ( typeM in fList ):
+                                    fList.remove(typeM)
+                        i += 1
 
             ''' case: (*type) var op (type) var'''
             seg = re.findall("\S*\s*\(\s*\**\s*([A-Za-z0-9_]+\s*)\)[A-Za-z0-9_]+", orgLine)
@@ -238,34 +263,36 @@ def extractVariables(code, fList, cond ):
                 typeM = clean(typeM)
                 if ( typeM and not typeM.isdigit() and not typeM in fList):
                     tempTypes.append(typeM)
-
-            ''' General splitting to extract the generic most case '''
-            regex = re.compile(r'[\n\r\t]')
-            orgLine = regex.sub(' ', str(orgLine))
-            cleaned = clearComments(orgLine.strip(), True)
-            for seg in cleaned:
-                seg = tsplit(seg,('\s', '*', '=', ',','~','!','@','#','$','%','^','&','*','+','=','`','[',']','{','}','|',';',':','<','>','/','?','.','(',')','\t', ' ','-', '\r','\\'))
-                for typeM in seg:
-                    if ( typeM.strip() and not ( len(typeM.strip()) == 1 and typeM.count("'") == 1) ):
-                        typeM = clean(re.findall("^\s*'?(.*[^'])'?\s*$", typeM)[0])
-                        if ( typeM and not typeM.isdigit() and not ( typeM in tempTypes or typeM in tempLVariables or typeM in fList or typeM in tempVariables ) ):
-                            tempVariables.append(typeM)
+                    
+            if ( cond ):
+                ''' General splitting to extract the generic most case '''
+                regex = re.compile(r'[\n\r\t]')
+                orgLine = regex.sub(' ', str(orgLine))
+                cleaned = clearComments(orgLine.strip(), True)
+                for seg in cleaned:
+                    seg = tsplit(seg,('\s', '*', '=', ',','~','!','@','#','$','%','^','&','*','+','=','`','[',']','{','}','|',';',':','<','>','/','?','.','(',')','\t', ' ','-', '\r','\\'))
+                    for typeM in seg:
+                        if ( typeM.strip() and not ( len(typeM.strip()) == 1 and typeM.count("'") == 1) ):
+                            typeM = clean(re.findall("^\s*'?(.*[^'])'?\s*$", typeM)[0])
+                            if ( typeM and not typeM.isdigit() and not ( typeM in tempTypes or typeM in tempLVariables or typeM in fList or typeM in tempVariables ) ):
+                                tempVariables.append(typeM)
                 
     for ctype in tempTypes:
         ctype = clean(ctype)
-        if ( not ( ctype.lower() in reserveWords or ctype in cDefinition or ctype in fList or ctype in gVariable or ctype in dFound )):
+        if ( not ( ctype.lower() in reserveWords or ctype in cDefinition or ctype in fList or ctype in gVariable or ctype in dFound or ctype in ignoreVar )):
             print "Type : "+ctype           
             cDefinition.append(ctype)
 
     for var in tempVariables:
         var = clean(var)
-        if ( not ( var in tempLVariables or var in gVariable or var.lower() in reserveWords or var in fList or var in cDefinition or var in dFound )):
+        if ( not ( var in tempLVariables or var in gVariable or var.lower() in reserveWords or var in fList or var in cDefinition or var in dFound or var in ignoreVar )):
             print "Var : "+var.strip()
             gVariable.append(var.strip())
 
 def varSearch(rootPath):
     ''' Recursively search for global variables and custom data types '''
-    patterns = ["*.h","*.c*"] 
+    patterns = ["*.h","*.c", "*.cpp"]
+    funcPattern = [ "^.*\(.*\*\s*(\S+)\)\s*\(.*", "^\s*[^\W]\S+.*[^\W]\s+\*?(\S+)\s*\(.*"]
 
     for pattern in patterns:
         for root, dirnames, filenames in os.walk(rootPath):
@@ -284,24 +311,26 @@ def varSearch(rootPath):
                     mcrCount = 0
                     lineNum = 0
                     finishComment = False
+                    gSkip =  False
 
-                    #print "/* file: "+str(root) +"/" +str(filename)+" :"+str(lineNum)+" */"
+ #                   print "/* file: "+str(root) +"/" +str(filename)+" :"+str(lineNum)+" */"
 
                     for line in inF:
 
                         orgLine = line
                         lineNum += 1
-
                         
                         if ( not line.strip() ):
                             continue
 
                         if ( re.findall("^[^#\{\}/\*\s][\W]+.*$", orgLine) ):
                             continue
+
+                        if len( re.findall("^.*extern.*\{.*$", line) ):
+                            sCount -= 1
                     
                         cStart += orgLine.count('/*')
                         cEnd += orgLine.count('*/')
-
                         if ( cStart != cEnd ):
                             if ( cStart < cEnd ):
                                 cStart = cEnd
@@ -312,14 +341,14 @@ def varSearch(rootPath):
                                 orgLine = re.findall("^.*/\*([\S\s]+)$", orgLine)[0]
                             else:
                                 continue
-                        elif ( orgLine.count("/*") and orgLine.count("*/") and re.findall("^\s*/\*.*\*/[\s]*$", orgLine) ):
+                        elif ( orgLine.count("/*") == 1 and orgLine.count("*/") == 1 and re.findall("^\s*/\*.*\*/[\s]*$", orgLine) ):                           
                             continue
-                        elif ( orgLine.count("*/") and re.findall("^.*\*/[\s]*$", orgLine) ):
+                        elif ( not orgLine.count("/*") and orgLine.endswith("*/") ):
                             continue
-                            
-                            
-                        sCount += orgLine.count('{');
-                        eCount += orgLine.count('}');
+                        
+                        if ( not  gSkip ):    
+                            sCount += orgLine.count('{');
+                            eCount += orgLine.count('}');
 
                         if len( re.findall("^.*extern\s*\"\s*C\s*\"\s*\{.*$", orgLine) ):
                             sCount -= sCount
@@ -338,6 +367,7 @@ def varSearch(rootPath):
                             if ( re.findall('^\s*#\s*endif.*$', orgLine) ):
                                 mcrCount -= 1
                                 temp = ""
+                                gSkip = False
 
                                 skip = False
                                 if ( len(preProcessorQ)): 
@@ -360,8 +390,6 @@ def varSearch(rootPath):
 
                                 if ( not mcrCount ):
                                     if ( found ):
-                                        print orgLine
-                                        print preProcessorQ
                                         for i in range( len(preProcessorQ) ):
                                             dDefinition.append(preProcessorQ.popleft())
                                         found = False
@@ -369,6 +397,7 @@ def varSearch(rootPath):
                                 continue
 
                             elif ( re.findall('^\s*#\s*else.*$', orgLine) ):
+                                gSkip = True
                                 if ( len(preProcessorQ)): 
                                     temp = preProcessorQ.pop()                 
                                 if ( re.findall('^\s*#\s*elif.*$', temp) ):
@@ -424,10 +453,6 @@ def varSearch(rootPath):
 
                                 extractVariables(tempCode, [], False)
 
-                                print "f "+str(preProcessorQ)
-                                print "Found :"+name
-                                print "f "+str(mcrCount)
-
 ##                                if ( name in gVariable ):
 ##                                    gVariable.remove(name)
 ##                                elif ( name in cDefinition ):
@@ -435,12 +460,57 @@ def varSearch(rootPath):
                                 dFound.append(name)
                                 continue
                             else:
-                                while ( re.findall("^.*\s*.*\\\s*$", orgLine ) ):
+                                while ( stripped(orgLine).endswith("\\")  ):
                                         orgLine = inF.next()
+                                        
+                                continue
+                        elif ( re.findall("^\s*#\s*define\s+.*$", orgLine) ):
+                                while ( stripped(orgLine).endswith("\\")  ):
+                                    orgLine = inF.next()
+                                    print orgLine,
+                                continue
+                        else:
+                            seg = ""
+                            for fpattern in funcPattern:
+                                if ( re.findall(fpattern, orgLine) ):
+                                    seg = re.findall(fpattern, orgLine)
+                                    break
+
+                            if ( seg ) :
+##                                print orgLine,
+                                start = 0
+                                end = 0
+                                line = orgLine
+                                skip = False
+                                funcDefn = False
+                                
+                                while True:                                             
+                                    if ( "{" in line and not funcDefn ):
+                                        funcDefn = True
+
+                                    if ( re.findall('^\s*#\s*else.*$', line) ):
+                                        skip = True
+
+                                    if ( re.findall('^\s*#\s*endif.*', line) ):
+                                        skip = False
+
+                                    if ( funcDefn ):
+                                        if ( not skip ):
+                                            start += line.count('{')
+                                            end += line.count('}')
+
+                                        if ( start == end ):
+                                            break
+                                    else:
+                                        if ( re.findall("^.*;\s*", line) ):
+                                            break
+##                                    print "s "+str(start)+" e "+str(end)+" : "+line,
+                                    line = inF.next()
+                                    
                                 continue
                                                
-                        elif ( re.findall("^\s*[A-Za-z0-9_]+[A-Za-z0-9_\*\s]*\s+\**\s*([A-Za-z0-9_]+)\s*;?\{?.*$", orgLine) ):
-                            seg = re.findall("^\s*[A-Za-z0-9_]+[A-Za-z0-9_\*\s]*\s+\**\s*([A-Za-z0-9_]+)\s*;?\{?.*$", orgLine)                                 
+                        if ( re.findall("^\s*[A-Za-z0-9_]+[A-Za-z0-9_\*\s]*\s+\**\s*([A-Za-z0-9_]+)\s*[;{]?.*$", orgLine) ):
+                            seg = re.findall("^\s*[A-Za-z0-9_]+[A-Za-z0-9_\*\s]*\s+\**\s*([A-Za-z0-9_]+)\s*[;{]?.*$", orgLine)                                 
                         elif ( re.findall("^\s*[A-Za-z0-9_]+[A-Za-z0-9_\*\s]*\s+\**\s*([A-Za-z0-9_]+)\s*=.*$", orgLine) ):
                             seg = re.findall("^\s*[A-Za-z0-9_]+[A-Za-z0-9_\*\s]*\s+\**\s*([A-Za-z0-9_]+)\s*=.*$", orgLine)                        
                         elif ( re.findall("^\s*[A-Za-z0-9_]+[A-Za-z0-9_\*\s]*\s+\**\s*([A-Za-z0-9_]+)\s*\[.*\].*$", orgLine) ):
@@ -449,31 +519,37 @@ def varSearch(rootPath):
                             continue
 
                         name = seg[0].strip()
+                        #print orgLine,
+                        print name
                         if ( name in gVariable or name in cDefinition ):
                             funcDefn = False
-                            funcFound = True
+                            funcFound = False
                             func = False
                             qTemp = deque()
                             start = 0
                             end = 0
                             line = orgLine
                             funcName =  ""
-                            funcPattern = [ "^.*\(.*\*\s*(\S+)\)\s*\(.*", "^\s*[^\W]\S+.*[^\W]\s+\*?(\S+)\s*\(.*"]
 
                             print "Found :"+name
 
+##                            if ( mcrCount ):
+##                                preProcessorQ.append("/* file: "+str(root) +"/"+ str(filename)+" */\n")
+##                                for i in range( len(structData) ):
+##                                    preProcessorQ.append(structData.popleft())
+##                                preProcessorQ.append("\n")
+##                                found = True
+##                            else :
+##                                dDefinition.append("/* file : "+str(root) +"/"+ str(filename)+" */\n")
+##                                for i in range( len(structData) ):
+##                                    dDefinition.append(structData.popleft())
+##                                dDefinition.append("\n")
+##                                found = False
+
                             if ( mcrCount ):
-                                preProcessorQ.append("/* file: "+str(root) +"/"+ str(filename)+" */\n")
-                                for i in range( len(structData) ):
-                                    preProcessorQ.append(structData.popleft())
-                                preProcessorQ.append("\n")
-                                found = True
-                            else :
-                                dDefinition.append("/* file : "+str(root) +"/"+ str(filename)+" */\n")
-                                for i in range( len(structData) ):
-                                    dDefinition.append(structData.popleft())
-                                dDefinition.append("\n")
-                                found = False
+                                preProcessorQ.append(orgLine)
+                            else:
+                                dDefinition.append(orgLine)
                             
                             while True:                                             
                                 if ( "{" in line and not funcDefn ):
@@ -488,13 +564,14 @@ def varSearch(rootPath):
                                             funcFound = True
                                             break
 
-                                if ( funcFound ):    
+                                if ( not funcFound ):    
                                     if ( mcrCount ):
                                         preProcessorQ.append(line)
                                     else:
                                         dDefinition.append(line)
-                                elif ( not func ):
                                     qTemp.append(line)
+                                    
+                                funcFound = False
 
                                 if ( funcDefn ):
                                     start += line.count('{')
@@ -506,7 +583,7 @@ def varSearch(rootPath):
                                     if ( re.findall("^.*;\s*", line) ):
                                         break
                                 line = inF.next()
-
+                            print qTemp
                             extractVariables(qTemp, [], False)
 
                             if ( name in gVariable ):
@@ -578,6 +655,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                     temp = []
                     inDef = False
                     insSturct = 0
+                    gSkip = False
                     
                     for line in inF:   
                         orgLine = line
@@ -592,12 +670,13 @@ def recFuncSearch(rootPath, funcName, rootFile):
 
                         if ( cStart != cEnd ):
                             continue
-                        
-                        sCount += orgLine.count('{');
-                        eCount += orgLine.count('}');
+
+                        if ( not gSkip ):
+                            sCount += orgLine.count('{');
+                            eCount += orgLine.count('}');
 
                         if len( re.findall("^.*extern.*\{.*$", line) ):
-                            sCount -= sCount
+                            sCount -= 1
 
                         if ( re.findall("^\s*[^#][\W].*$", line) ):
                             continue
@@ -776,6 +855,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                 ''' To remove unwanted preprocessor directives '''
                                 match = re.findall('^#\s*end.*', stripped(line))
                                 if ( match ):
+                                    gSkip = False
                                     if ( preProcessorQIgn ):
                                         preProcessorQIgn -= 1
                                     else :
@@ -791,13 +871,16 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                         if ( len(preProcessorQ)  ):
                                             preProcessorQ.pop()
                                         
-                                if ( re.findall('^#\s*else.*', orgLine) and found and not preProcessorQIgn and mcrCount):
-                                    print orgLine,
-                                    fDeclaration.append(orgLine)
+                                if ( re.findall('^#\s*else.*', orgLine) ):
+                                    gSkip = True
+                                    if ( found and not preProcessorQIgn and mcrCount):
+                                        print orgLine,
+                                        fDeclaration.append(orgLine)
 
                                 if ( re.findall('^#\s*elif.*', orgLine) and found ):
                                     print orgLine,
                                     preProcessorQ.append(orgLine)
+                                
 
                         ''' If the function header is within preprocessor directive keep on looking for alternative delarations'''
                         if ( found and not mcrCount ) :
@@ -865,6 +948,8 @@ def recFuncSearch(rootPath, funcName, rootFile):
                     preProcessorQ = deque()
                     preProcessorQIgn = 0
                     fList = []
+                    gSkip = False
+                    
                     for line in inF:                        
                         orgLine = line
                         line = stripped(line)
@@ -875,8 +960,12 @@ def recFuncSearch(rootPath, funcName, rootFile):
                         if ( cStart != cEnd ):
                             continue
 
-                        sCount += line.count('{');
-                        eCount += line.count('}');
+                        if ( not gSkip ):
+                            sCount += line.count('{');
+                            eCount += line.count('}');
+
+                        if len( re.findall("^.*extern.*\{.*$", line) ):
+                            sCount -= 1
 
                         if ( sCount != eCount ):
                             continue
@@ -968,6 +1057,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                     ''' To remove unwanted preprocessor directives '''
                                     match = re.findall('^#\s*end.*', stripped(line))
                                     if ( match ):
+                                        gSkip = True
                                         if ( preProcessorQIgn > 0 ):
                                             preProcessorQIgn -= 1
                                         else :
@@ -983,9 +1073,12 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                             if ( len(preProcessorQ)  ):
                                                 preProcessorQ.pop()
                                             
-                                    if ( re.findall('^#\s*else.*', orgLine) and found and (not preProcessorQIgn) and mcrCount ):
-                                        print orgLine,
-                                        fDefinition.append(orgLine)
+                                    if ( re.findall('^#\s*else.*', orgLine) ):
+                                        gSkip = False
+                                        
+                                        if (found and (not preProcessorQIgn) and mcrCount ):
+                                            print orgLine,
+                                            fDefinition.append(orgLine)
 
                                     if ( re.findall('^#\s*elif.*', orgLine) and found ):
                                         print orgLine,
@@ -1029,14 +1122,14 @@ def main(argv) :
     functionName = "EC_KEY_new_by_curve_name"
 
  #   recFuncSearch(path, functionName,".")
-    gVariable.append("ossl_ssize_t")
-    gVariable.append("OPENSSL_EXPORT")
+    gVariable.append("KEY_TABLE_TYPE")
+ #   gVariable.append("lock_names")
     varSearch(path)
 
-    print str(gVariable)
-    print str(cDefinition)
-
-    print len(fDeclaration)
+##    print str(gVariable)
+##    print str(cDefinition)
+##
+##    print len(fDeclaration)
 
     ''' Writing all the header declarations '''
     if ( len(dDefinition) ):
