@@ -27,7 +27,7 @@ fList = []
 
 reserveWords = [ "auto", "if", "break", "int", "case", "long", "char", "register", "continue", "return", "default", "short", "do", "sizeof", "double", "static", \
                         "else", "struct", "entry", "switch", "extern", "typedef", "float", "union", "for", "unsigned", "goto", "while", "enum", "void", "const", "signed", \
-                         "volatile", "null", "stderr", "fprintf", "memset", "malloc", "true", "false", "define", "elif"]
+                         "volatile", "null", "stderr", "fprintf", "memset", "malloc", "true", "false", "define", "elif", "/"]
 
 def stripped(x):
     ''' Removes all control characters from a string '''
@@ -136,6 +136,9 @@ def extractVariables(code, fList, cond ):
 
         orgLine = code.popleft().strip()
         #print orgLine
+
+        if ( orgLine.startswith("#") ):
+            cond = True
 
         if ( re.findall("^[^#\{\}/\*\s][\W]+.*$", orgLine) ):
             continue
@@ -428,13 +431,15 @@ def varSearch(rootPath):
 ##                                    preProcessorQ.append(orgLine)
 ##                                else:
 ##                                    dDefinition.append(orgLine)
-##                                continue
+##                                continue    
       
                         if ( re.findall("^\s*#\s*define\s+([A-Za-z0-9_]+)\s+[\(A-Za-z0-9_]+\s*.*$", orgLine) ):
-                            name = re.findall("^\s*#\s*define\s*([A-Za-z0-9_]*)\s+[\(A-Za-z0-9_]+\s*.*$", orgLine)[0].strip()
+                            name = re.findall("^\s*#\s*define\s+([A-Za-z0-9_]+)\s+[\(A-Za-z0-9_]+\s*.*$", orgLine)[0].strip()
                             if ( name in gVariable or name in cDefinition ):
                                 tempCode.append(orgLine)
                                 found = True
+
+                                print "Found "+name
 
                                 if ( mcrCount ):
                                     preProcessorQ.append(orgLine)
@@ -1121,7 +1126,7 @@ def main(argv) :
     functionName = "EC_KEY_new_by_curve_name"
 
  #   recFuncSearch(path, functionName,".")
-    gVariable.append("KEY_TABLE_TYPE")
+    gVariable.append("CAMELLIA_TABLE_WORD_LEN")
  #   gVariable.append("lock_names")
     varSearch(path)
 
