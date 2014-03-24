@@ -430,8 +430,8 @@ def varSearch(rootPath):
 ##                                    dDefinition.append(orgLine)
 ##                                continue
       
-                        if ( re.findall("^\s*#\s*define\s+([A-Za-z0-9_]+)\s+[A-Za-z0-9_]+\s*.*$", orgLine) ):
-                            name = re.findall("^\s*#\s*define\s*([A-Za-z0-9_]*)\s+[A-Za-z0-9_]+\s*.*$", orgLine)[0].strip()
+                        if ( re.findall("^\s*#\s*define\s+([A-Za-z0-9_]+)\s+[\(A-Za-z0-9_]+\s*.*$", orgLine) ):
+                            name = re.findall("^\s*#\s*define\s*([A-Za-z0-9_]*)\s+[\(A-Za-z0-9_]+\s*.*$", orgLine)[0].strip()
                             if ( name in gVariable or name in cDefinition ):
                                 tempCode.append(orgLine)
                                 found = True
