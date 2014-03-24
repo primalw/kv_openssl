@@ -135,7 +135,7 @@ def extractVariables(code, fList, cond ):
     for num in range( len(code) ):
 
         orgLine = code.popleft().strip()
-        print orgLine
+        print "var search "+orgLine
 
         if ( re.findall("^[^#\{\}/\*\s][\W]+.*$", orgLine) ):
             continue
@@ -213,7 +213,6 @@ def extractVariables(code, fList, cond ):
                                 for subType in subTypes:
                                     subType = clean(subType)
                                     if ( subType.count("*") ):
-                                        print subType
                                         subType = re.findall("\**\s*([A-Za-z0-9_]+)\s*\**", subType)[0]
                                         subType = clean(subType)
                                     if ( subType and not ( subType in tempLVariables or subType in fList or subType in reserveWords or subType in tempVariables) ):
@@ -224,8 +223,8 @@ def extractVariables(code, fList, cond ):
                             else:
                                 rem = item
                                 ''' case: type var1 = var2; '''
-                                match = re.findall("^\s*([A-Za-z0-9_]+)\s*;?\*$", rem)
-                                if ( match and not clean(match[0]).isdigit() and not clean(match[0]) in tempVariables and not clann(match[0]) in fList):
+                                match = re.findall("^\s*([A-Za-z0-9_]+)\s*;?\s*$", rem)
+                                if ( match and not clean(match[0]).isdigit() and not clean(match[0]) in tempVariables and not clean(match[0]) in fList):
                                     tempVariables.append(clean(match[0]))
 
                                 ''' case: type var1 = (*type)var2; '''
@@ -240,6 +239,7 @@ def extractVariables(code, fList, cond ):
             ''' case: pointer derefencing'''
             for regex in drefPatterns:
                 seg = re.findall(regex, orgLine)
+                print seg
                 i = 0
                 for x in seg:
                     segSplit = re.findall("\s*\((.*)\)\s*",str(x))[0].split(",")
@@ -467,7 +467,6 @@ def varSearch(rootPath):
                         elif ( re.findall("^\s*#\s*define\s+.*$", orgLine) ):
                                 while ( stripped(orgLine).endswith("\\")  ):
                                     orgLine = inF.next()
-                                    print orgLine,
                                 continue
                         else:
                             seg = ""
@@ -520,7 +519,6 @@ def varSearch(rootPath):
 
                         name = seg[0].strip()
                         #print orgLine,
-                        print name
                         if ( name in gVariable or name in cDefinition ):
                             funcDefn = False
                             funcFound = False
@@ -583,7 +581,6 @@ def varSearch(rootPath):
                                     if ( re.findall("^.*;\s*", line) ):
                                         break
                                 line = inF.next()
-                            print qTemp
                             extractVariables(qTemp, [], False)
 
                             if ( name in gVariable ):
