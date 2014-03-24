@@ -135,7 +135,7 @@ def extractVariables(code, fList, cond ):
     for num in range( len(code) ):
 
         orgLine = code.popleft().strip()
-        print "var search "+orgLine
+        #print orgLine
 
         if ( re.findall("^[^#\{\}/\*\s][\W]+.*$", orgLine) ):
             continue
@@ -239,7 +239,6 @@ def extractVariables(code, fList, cond ):
             ''' case: pointer derefencing'''
             for regex in drefPatterns:
                 seg = re.findall(regex, orgLine)
-                print seg
                 i = 0
                 for x in seg:
                     segSplit = re.findall("\s*\((.*)\)\s*",str(x))[0].split(",")
@@ -313,7 +312,7 @@ def varSearch(rootPath):
                     finishComment = False
                     gSkip =  False
 
- #                   print "/* file: "+str(root) +"/" +str(filename)+" :"+str(lineNum)+" */"
+                    #print "/* file: "+str(root) +"/" +str(filename)+" :"+str(lineNum)+" */"
 
                     for line in inF:
 
@@ -325,9 +324,6 @@ def varSearch(rootPath):
 
                         if ( re.findall("^[^#\{\}/\*\s][\W]+.*$", orgLine) ):
                             continue
-
-                        if len( re.findall("^.*extern.*\{.*$", line) ):
-                            sCount -= 1
                     
                         cStart += orgLine.count('/*')
                         cEnd += orgLine.count('*/')
@@ -350,6 +346,9 @@ def varSearch(rootPath):
                             sCount += orgLine.count('{');
                             eCount += orgLine.count('}');
 
+                        if ( eCount > sCount ):
+                            eCount = sCount
+
                         if len( re.findall("^.*extern\s*\"\s*C\s*\"\s*\{.*$", orgLine) ):
                             sCount -= sCount
 
@@ -369,22 +368,22 @@ def varSearch(rootPath):
                                 temp = ""
                                 gSkip = False
 
-                                skip = False
+                                sSkip = False
                                 if ( len(preProcessorQ)): 
                                     temp = preProcessorQ.pop()
                                 if ( re.findall('^\s*#\s*if.*$', temp ) ):
-                                    skip = True
+                                    sSkip = True
 
                                 elif ( re.findall('^\s*#\s*else.*$', temp) ):
                                     if ( len(preProcessorQ)): 
                                         temp = preProcessorQ.pop()                 
                                     if ( re.findall('^\s*#\s*if.*$', temp) ):
-                                        skip = True
+                                        sSkip = True
 
                                 elif ( re.findall('^\s*#\s*elif.*$', temp) ):
-                                    skip = True
+                                    sSkip = True
 
-                                if ( not skip ):                                    
+                                if ( not sSkip ):                                    
                                     preProcessorQ.append(temp)
                                     preProcessorQ.append(orgLine)
 
@@ -530,6 +529,7 @@ def varSearch(rootPath):
                             funcName =  ""
 
                             print "Found :"+name
+                            found = True
 
 ##                            if ( mcrCount ):
 ##                                preProcessorQ.append("/* file: "+str(root) +"/"+ str(filename)+" */\n")
@@ -543,11 +543,6 @@ def varSearch(rootPath):
 ##                                    dDefinition.append(structData.popleft())
 ##                                dDefinition.append("\n")
 ##                                found = False
-
-                            if ( mcrCount ):
-                                preProcessorQ.append(orgLine)
-                            else:
-                                dDefinition.append(orgLine)
                             
                             while True:                                             
                                 if ( "{" in line and not funcDefn ):
@@ -581,6 +576,7 @@ def varSearch(rootPath):
                                     if ( re.findall("^.*;\s*", line) ):
                                         break
                                 line = inF.next()
+                                
                             extractVariables(qTemp, [], False)
 
                             if ( name in gVariable ):
@@ -674,6 +670,9 @@ def recFuncSearch(rootPath, funcName, rootFile):
 
                         if len( re.findall("^.*extern.*\{.*$", line) ):
                             sCount -= 1
+
+                        if ( eCount > sCount ):
+                            eCount = sCount
 
                         if ( re.findall("^\s*[^#][\W].*$", line) ):
                             continue
@@ -963,6 +962,9 @@ def recFuncSearch(rootPath, funcName, rootFile):
 
                         if len( re.findall("^.*extern.*\{.*$", line) ):
                             sCount -= 1
+
+                        if ( eCount > sCount ):
+                            eCount = sCount
 
                         if ( sCount != eCount ):
                             continue
