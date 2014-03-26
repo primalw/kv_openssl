@@ -645,7 +645,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
     inDef = False
     mcrCount = 0
     fList = []
-    patterns = ["*.h","*.c*"]
+    patterns = ["*.h","*.c", "*.cpp"]
     done = False
     funcDefn = False
     localFile = ""    
@@ -1158,11 +1158,11 @@ def main(argv) :
     ''' Has to be the root path of the code base '''
     path = "/Volumes/work/Phd/ECDH/kv_openssl/"
     ''' Name of the looked function '''
-    functionName = "EC_KEY_new_by_curve_name"
+    functionName = "ecdh_low"
 
- #   recFuncSearch(path, functionName,".")
+    recFuncSearch(path, functionName,".")
  #   gVariable.append("EC_KEY_new_by_curve_name")
-    gVariable.append("BIGNUM")
+#    gVariable.append("BIGNUM")
     varSearch(path)
 
 ##    print str(gVariable)
