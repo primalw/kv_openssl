@@ -1156,9 +1156,9 @@ def main(argv) :
     functionName = sys.argv[2]
     
     ''' Has to be the root path of the code base '''
-    path = "/Volumes/work/Phd/ECDH/kv_openssl/"
+    path = "D:\\PhD\\ECDH\\kv_openssl\\"
     ''' Name of the looked function '''
-    functionName = "ecdh_low"
+    functionName = "EC_KEY_new_by_curve_name"
 
     recFuncSearch(path, functionName,".")
  #   gVariable.append("EC_KEY_new_by_curve_name")
