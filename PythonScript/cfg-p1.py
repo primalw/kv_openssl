@@ -270,24 +270,24 @@ def extractVariables(code, fList, cond ):
                 if ( typeM and not typeM.isdigit() and not typeM in fList):
                     tempTypes.append(typeM)
                     
-            if ( cond or preDef ):
-                ''' General splitting to extract the generic most case '''
-                regex = re.compile(r'[\n\r\t]')
-                orgLine = regex.sub(' ', str(orgLine))
-                cleaned = clearComments(orgLine.strip(), True)
-                for seg in cleaned:
-                    seg = tsplit(seg,('\s', '*', '=', ',','~','!','@','#','$','%','^','&','*','+','=','`','[',']','{','}','|',';',':','<','>','/','?','.','(',')','\t', ' ','-', '\r','\\', '\''))
-                    for typeM in seg:
-                        if ( typeM.strip() and not ( len(typeM.strip()) == 1 and typeM.count("'") == 1) ):
-                            typeM = clean(re.findall("^\s*'?(.*[^'])'?\s*$", typeM)[0])
-                            if ( typeM and not typeM.isdigit() and not ( typeM in tempTypes or typeM in tempLVariables or typeM in fList or typeM in tempVariables ) ):
-                                tempVariables.append(typeM)
+        if ( cond or preDef ):
+            ''' General splitting to extract the generic most case '''
+            regex = re.compile(r'[\n\r\t]')
+            orgLine = regex.sub(' ', str(orgLine))
+            cleaned = clearComments(orgLine.strip(), True)
+            for seg in cleaned:
+                seg = tsplit(seg,('\s', '*', '=', ',','~','!','@','#','$','%','^','&','*','+','=','`','[',']','{','}','|',';',':','<','>','/','?','.','(',')','\t', ' ','-', '\r','\\', '\''))
+                for typeM in seg:
+                    if ( typeM.strip() and not ( len(typeM.strip()) == 1 and typeM.count("'") == 1) ):
+                        typeM = clean(re.findall("^\s*'?(.*[^'])'?\s*$", typeM)[0])
+                        if ( typeM and not typeM.isdigit() and not ( typeM in tempTypes or typeM in tempLVariables or typeM in fList or typeM in tempVariables ) ):
+                            tempVariables.append(typeM)
                 
     for ctype in tempTypes:
         ctype = clean(ctype)
         if ( not ( ctype.lower() in reserveWords or ctype in cDefinition or ctype in fList or ctype in gVariable or ctype in dFound or ctype in ignoreVar )):
             #print "Type : "+ctype
-            if ( not cond and preDef and ctype not in newDef ):
+            if ( not cond and ctype not in newDef ):
                 newDef.append(ctype)
             elif ( cond ):
                 cDefinition.append(ctype)
@@ -296,7 +296,7 @@ def extractVariables(code, fList, cond ):
         var = clean(var)
         if ( not ( var in tempLVariables or var in gVariable or var.lower() in reserveWords or var in fList or var in cDefinition or var in dFound or var in ignoreVar )):
             #print "Var : "+var.strip()
-            if ( not cond and preDef and var not in newDef ):
+            if ( not cond and var not in newDef ):
                 newDef.append(var)
             elif ( cond ):
                 gVariable.append(var.strip())
@@ -444,9 +444,9 @@ def varSearch(rootPath):
     ##                                else:
     ##                                    dDefinition.append(orgLine)
     ##                                continue    
-          
-                            if ( re.findall("^\s*#\s*define\s+([A-Za-z0-9_]+)\s+[\(A-Za-z0-9_]+\s*.*$", orgLine) ):
-                                name = re.findall("^\s*#\s*define\s+([A-Za-z0-9_]+)\s+[\(A-Za-z0-9_]+\s*.*$", orgLine)[0].strip()
+                            name = re.findall("^\s*#\s*define\s+([A-Za-z0-9_]+)\s+[\(A-Za-z0-9_]+\s*.*$", orgLine) 
+                            if ( name ):
+                                name = name[0].strip()
                                 if ( name in gVariable or name in cDefinition ):
                                     tempCode.append(orgLine)
                                     found = True
@@ -487,12 +487,12 @@ def varSearch(rootPath):
                             else:
                                 seg = ""
                                 for fpattern in funcPattern:
-                                    if ( re.findall(fpattern, orgLine) ):
-                                        seg = re.findall(fpattern, orgLine)
+                                    seg = re.findall(fpattern, orgLine)
+                                    if ( seg ):
                                         break
 
                                 if ( seg ) :
-    ##                                print orgLine,
+##                                    print orgLine,
                                     start = 0
                                     end = 0
                                     line = orgLine
@@ -607,6 +607,7 @@ def varSearch(rootPath):
 ##                                 break
 ##                        if ( not ( len(gVariable) or len(cDefinition) ) ):
 ##                            break
+                            
                         for i in range( len(fileContent) ):
                             name = fileContent.popleft()
                             if ( name in gVariable ):
@@ -621,6 +622,7 @@ def varSearch(rootPath):
 ##                    break
 ##            if ( not ( len(gVariable) or len(cDefinition) ) ):
 ##                break
+        #print newDef
         if ( len(newDef) ):
             gVariable.clear()
             for i in range( len(newDef) ):
@@ -757,6 +759,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                     found = True
                                     fHdr = orgLine
                                     funcMap.add(funcName)
+                                    tempCode = deque()
 
                                     ''' if the function is a macro '''
                                     if ( re.findall("^\s*#\s*.*$", orgLine) ):
@@ -766,6 +769,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                             fDeclaration.append(preProcessorQ.popleft())
                                                
                                         fDeclaration.append(orgLine)
+                                        tempCode.append(orgLine)
                                         #print orgLine,
 
                                         ''' Looking for other function calls within the macro '''
@@ -797,6 +801,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                             cEnd += line.count('*/')
                                             #print orgLine,
                                             fDeclaration.append(orgLine)
+                                            tempCode.append(orgLine)
                                     else:
                                         funcDefn = False
                                         qTemp = deque()
@@ -865,7 +870,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                                 cStart += ln.count('/*');
                                                 cEnd += ln.count('*/');
 
-                                            extractVariables(tempCode, fList, True)
+                                    extractVariables(tempCode, fList, True)
                                                 
                         else:
                             if ( not inMacro and orgLine.startswith("#") and  line.endswith("\\") ):
@@ -1155,9 +1160,9 @@ def main(argv) :
     ''' Name of the looked function '''
     functionName = "EC_KEY_new_by_curve_name"
 
-    recFuncSearch(path, functionName,".")
+ #   recFuncSearch(path, functionName,".")
  #   gVariable.append("EC_KEY_new_by_curve_name")
- #   gVariable.append("lock_names")
+    gVariable.append("BIGNUM")
     varSearch(path)
 
 ##    print str(gVariable)
