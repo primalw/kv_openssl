@@ -219,7 +219,7 @@ def extractVariables(code, fList, cond ):
 
                                 for subType in subTypes:
                                     subType = clean(subType)
-                                    if ( subType.count("*") ):
+                                    if ( re.findall("\**\s*([A-Za-z0-9_]+)\s*\**", subType) ):
                                         subType = re.findall("\**\s*([A-Za-z0-9_]+)\s*\**", subType)[0]
                                         subType = clean(subType)
                                     if ( subType and not ( subType in tempLVariables or subType in fList or subType in reserveWords or subType in tempVariables) ):
@@ -276,7 +276,7 @@ def extractVariables(code, fList, cond ):
                 orgLine = regex.sub(' ', str(orgLine))
                 cleaned = clearComments(orgLine.strip(), True)
                 for seg in cleaned:
-                    seg = tsplit(seg,('\s', '*', '=', ',','~','!','@','#','$','%','^','&','*','+','=','`','[',']','{','}','|',';',':','<','>','/','?','.','(',')','\t', ' ','-', '\r','\\'))
+                    seg = tsplit(seg,('\s', '*', '=', ',','~','!','@','#','$','%','^','&','*','+','=','`','[',']','{','}','|',';',':','<','>','/','?','.','(',')','\t', ' ','-', '\r','\\', '\''))
                     for typeM in seg:
                         if ( typeM.strip() and not ( len(typeM.strip()) == 1 and typeM.count("'") == 1) ):
                             typeM = clean(re.findall("^\s*'?(.*[^'])'?\s*$", typeM)[0])
@@ -286,7 +286,7 @@ def extractVariables(code, fList, cond ):
     for ctype in tempTypes:
         ctype = clean(ctype)
         if ( not ( ctype.lower() in reserveWords or ctype in cDefinition or ctype in fList or ctype in gVariable or ctype in dFound or ctype in ignoreVar )):
-            print "Type : "+ctype
+            #print "Type : "+ctype
             if ( not cond and preDef and ctype not in newDef ):
                 newDef.append(ctype)
             elif ( cond ):
@@ -295,7 +295,7 @@ def extractVariables(code, fList, cond ):
     for var in tempVariables:
         var = clean(var)
         if ( not ( var in tempLVariables or var in gVariable or var.lower() in reserveWords or var in fList or var in cDefinition or var in dFound or var in ignoreVar )):
-            print "Var : "+var.strip()
+            #print "Var : "+var.strip()
             if ( not cond and preDef and var not in newDef ):
                 newDef.append(var)
             elif ( cond ):
@@ -451,7 +451,7 @@ def varSearch(rootPath):
                                     tempCode.append(orgLine)
                                     found = True
 
-                                    print "Found "+name
+                                    #print "Found "+name
 
                                     if ( mcrCount ):
                                         preProcessorQ.append(orgLine)
@@ -545,7 +545,7 @@ def varSearch(rootPath):
                                 line = orgLine
                                 funcName =  ""
 
-                                print "Found :"+name
+                                #print "Found :"+name
                                 found = True
 
     ##                            if ( mcrCount ):
@@ -628,7 +628,7 @@ def varSearch(rootPath):
         else:
             break
 
-    print str(preProcessorQ)
+    #print str(preProcessorQ)
                             
 def recFuncSearch(rootPath, funcName, rootFile):
     ''' Recursively searches for a given function name '''
@@ -722,12 +722,12 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                 for i in range( len(preProcessorQ) ):
                                     fDeclaration.append(preProcessorQ.popleft())
                                     
-                                print orgLine,
+                                #print orgLine,
                                 fDeclaration.append(orgLine)
 
                                 while ( not stripped(line).endswith(";") ):  
                                     line = inF.next()
-                                    print line,
+                                    #print line,
                                     fDeclaration.append(line)
 
                                 ''' Recursively searches for a given function name '''
@@ -766,21 +766,25 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                             fDeclaration.append(preProcessorQ.popleft())
                                                
                                         fDeclaration.append(orgLine)
-                                        print orgLine,
+                                        #print orgLine,
 
                                         ''' Looking for other function calls within the macro '''
                                         while True:
                                             if ( line.count('(') and (not fHdr.startswith("//") ) and ( cStart == cEnd )):
                                                 clnSegments = clearComments(line, ( cStart == cEnd ))
+                                                i = 0
                                                 for seg in clnSegments:
-                                                    paraList = seg.split("(");
+                                                    paraList = []
+                                                    if ( seg.count("(")):
+                                                        paraList = seg.split("(");
                                                     for slc in paraList:
-                                                        slc = slc.split()[ len( slc.split() ) - 1 ]
-                                                        slc = cleanFunctionName(slc)
-                                                        slc = clean(slc)
-                                                        if ( slc and slc != funcName and i < seg.count("(") ):
-                                                            if(  len (re.findall("[^=\+\?\.\*\^\$\(\)\[\]\{\}\|\\!@#%&\"\'/\s\-<>:;`]", slc.strip())) == len(slc.strip())):
-                                                                fList.append(slc)
+                                                        if ( slc.strip() ):    
+                                                            slc = slc.split()[ len( slc.split() ) - 1 ]
+                                                            slc = cleanFunctionName(slc)
+                                                            slc = clean(slc)
+                                                            if ( slc and slc != funcName and i < seg.count("(") ):
+                                                                if(  len (re.findall("[^=\+\?\.\*\^\$\(\)\[\]\{\}\|\\!@#%&\"\'/\s\-<>:;`]", slc.strip())) == len(slc.strip())):
+                                                                    fList.append(slc)
                                                         i += 1
 
                                             if (not line.endswith("\\") ):
@@ -791,7 +795,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                             line = stripped(line)
                                             cStart += line.count('/*')
                                             cEnd += line.count('*/')
-                                            print orgLine,
+                                            #print orgLine,
                                             fDeclaration.append(orgLine)
                                     else:
                                         funcDefn = False
@@ -840,7 +844,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                                     regex = re.compile(r'[\n\r\t]')
                                                     ln = regex.sub(' ', str(ln))
                                                     cleaned = clearComments(ln, True)
-                                                    print cleaned
+                                                    paraList = []
                                                     for cln in cleaned:
                                                         for x in str(cln).split("("):
                                                             paraList.append(x)
@@ -855,7 +859,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                                                     fList.append(slc)
                                                         i += 1
                                                                  
-                                                print ln,
+                                                #print ln,
                                                 fDeclaration.append(ln)
                                                 
                                                 cStart += ln.count('/*');
@@ -890,7 +894,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                         inDef = False
                                         #print lineNum
                                         if ( found ):
-                                            print orgLine,
+                                            #print orgLine,
                                             fDeclaration.append(orgLine)
                                             if ( not mcrCount ):
                                                 break
@@ -901,11 +905,11 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                 if ( re.findall('^#\s*else.*', orgLine) ):
                                     gSkip = True
                                     if ( found and not preProcessorQIgn and mcrCount):
-                                        print orgLine,
+                                        #print orgLine,
                                         fDeclaration.append(orgLine)
 
                                 if ( re.findall('^#\s*elif.*', orgLine) and found ):
-                                    print orgLine,
+                                    #print orgLine,
                                     preProcessorQ.append(orgLine)
                                 
 
@@ -919,7 +923,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
             if ( found ) :
                 break
             
-        print pattern
+        #print pattern
         if ( found ) :
             break
     
@@ -930,7 +934,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
         funcNameCln = cleanFunctionName(fListItem) 
         if ( ( not funcNameCln in reserveWords ) and len(funcNameCln) > 0 and not funcNameCln == funcName ):  
             if not ( ( funcNameCln in ntFoundFunc) or ( funcNameCln in funcMap ) or ( funcNameCln in fListCln ) ):
-                print "Adding Function "+funcNameCln
+                #print "Adding Function "+funcNameCln
                 fListCln.append(funcNameCln)
 
     ''' Begins the recursive search for confirmed function calls '''
@@ -1047,7 +1051,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                                     fList.append(slc)
                                         i += 1
                                  
-                                print orgLine,
+                                #print orgLine,
                                 fDefinition.append(orgLine)
                                 
                                 sCount += ln.count('{');
@@ -1063,7 +1067,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
 
                             extractVariables(tempCode, fList, True)
 
-                            print mcrCount
+                            #print mcrCount
                             if ( not mcrCount ):
                                 break
                             
@@ -1120,7 +1124,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                         funcNameCln = cleanFunctionName(fListItem) 
                         if ( ( not funcNameCln in reserveWords ) and len(funcNameCln) > 0 ):                        
                             if not ( ( funcNameCln in ntFoundFunc) or ( funcNameCln in funcMap ) or ( funcNameCln in fListCln ) ):
-                                print "Adding Function "+funcNameCln
+                                #print "Adding Function "+funcNameCln
                                 fListCln.append(funcNameCln)
 
                     ''' Begins the recursive search for confirmed function calls '''
@@ -1151,8 +1155,8 @@ def main(argv) :
     ''' Name of the looked function '''
     functionName = "EC_KEY_new_by_curve_name"
 
- #   recFuncSearch(path, functionName,".")
-    gVariable.append("CAMELLIA_TABLE_WORD_LEN")
+    recFuncSearch(path, functionName,".")
+ #   gVariable.append("EC_KEY_new_by_curve_name")
  #   gVariable.append("lock_names")
     varSearch(path)
 
