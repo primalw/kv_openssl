@@ -763,7 +763,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
 
                                     ''' if the function is a macro '''
                                     if ( re.findall("^\s*#\s*.*$", orgLine) ):
-
+                                        done = True
                                         fDeclaration.append("/* file: "+funcName+" : "+str(root) + str(filename)+" */\n") 
                                         for i in range( len(preProcessorQ) ):
                                             fDeclaration.append(preProcessorQ.popleft())
@@ -1104,7 +1104,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                             inDef = False
 
                                             if ( found ):
-                                                print orgLine,
+                                                #print orgLine,
                                                 fDefinition.append(orgLine)
                                                 if ( not mcrCount ):
                                                     break
@@ -1116,11 +1116,11 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                         gSkip = False
                                         
                                         if (found and (not preProcessorQIgn) and mcrCount ):
-                                            print orgLine,
+                                            #print orgLine,
                                             fDefinition.append(orgLine)
 
                                     if ( re.findall('^#\s*elif.*', orgLine) and found ):
-                                        print orgLine,
+                                        #print orgLine,
                                         preProcessorQ.append(orgLine)
 
                     ''' Cleaning potential function calls '''
