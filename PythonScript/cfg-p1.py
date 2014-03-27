@@ -26,6 +26,8 @@ dDefinition = deque()
 dFound = deque()
 ''' Queue of new data definitions '''
 newDef = deque()
+''' Queue of new data definitions '''
+inStructFunc = deque()
 
 fList = []
 
@@ -262,6 +264,8 @@ def extractVariables(code, fList, cond ):
 
                                 if ( typeM in fList ):
                                     fList.remove(typeM)
+                                    if ( not typeM in inStructFunc ):
+                                        inStructFunc.append(typeM)
                         i += 1
 
             ''' case: (*type) var op (type) var'''
@@ -287,20 +291,20 @@ def extractVariables(code, fList, cond ):
     for ctype in tempTypes:
         ctype = clean(ctype)
         if ( not ( ctype.lower() in reserveWords or ctype in cDefinition or ctype in fList or ctype in gVariable or ctype in dFound or ctype in ignoreVar )):
-            #print "Type : "+ctype
             if ( not cond and ctype not in newDef ):
+                print "Type : "+ctype
                 newDef.append(ctype)
-            elif ( cond ):
-                cDefinition.append(ctype)
+            cDefinition.append(ctype)
 
     for var in tempVariables:
         var = clean(var)
         if ( not ( var in tempLVariables or var in gVariable or var.lower() in reserveWords or var in fList or var in cDefinition or var in dFound or var in ignoreVar )):
-            #print "Var : "+var.strip()
             if ( not cond and var not in newDef ):
+                print "Var : "+var.strip()
                 newDef.append(var)
             elif ( cond ):
                 gVariable.append(var.strip())
+            cDefinition.append(var.strip())
 
 def varSearch(rootPath):
     ''' Recursively search for global variables and custom data types '''
@@ -459,7 +463,7 @@ def varSearch(rootPath):
                                     varTemp.append(orgLine)
                                     found = True
 
-                                    #print "Found "+name
+                                    print "Found "+name
 
                                     if ( mcrCount ):
                                         preProcessorQ.append(orgLine)
@@ -543,7 +547,7 @@ def varSearch(rootPath):
                             if ( name ):
                                 secondMatch = False
                                 if ( name in gVariable or name in cDefinition or name in newDef):
-                                    #print "Found :"+name
+                                    print "Found :"+name
                                     found = True
                                 else:
                                     if ( not ( "typedef" in orgLine or "struct" in orgLine ) ):
@@ -561,28 +565,34 @@ def varSearch(rootPath):
                                 cmtE = 0
                                 line = orgLine
                                 funcName =  ""
-                                lineCount = 1
+                                lineCount = 0
+
+                                print "start"
                                 
                                 while True:
                                     if ( "{" in line and not funcDefn ):
                                         funcDefn = True
                                     func = False
-                                    for fpattern in funcPattern:
-                                        funcName = re.findall(fpattern, line)
-                                        if ( funcName ):
-                                            func = True
-                                            break
-
-                                    if ( mcrCount ):
-                                        preProcessorQ.append(line)
-                                    else:
-                                        qTemp.append(line)
-
+                                    
                                     cmtS += line.count('/*')
                                     cmtE += line.count('*/')
 
-                                    if ( cmtS == cmtE ):
-                                        if ( not func ):
+                                    if ( cmtS == cmtE or stripped(line).startswith("//") ):
+                                        for fpattern in funcPattern:
+                                            funcName = re.findall(fpattern, line)
+                                            if ( funcName ):
+                                                func = True
+                                                break
+
+                                    if ( not func or ( func and funcName in inStructFunc ) ):
+                                        if ( mcrCount ):
+                                            preProcessorQ.append(line)
+                                            lineCount += 1
+                                        else:
+                                            qTemp.append(line)
+
+                                    if ( cmtS == cmtE or stripped(line).startswith("//") ):
+                                        if ( not func or ( func and funcName in inStructFunc ) ):
                                             varTemp.append(line)
                                         if ( funcDefn ):
                                             start += line.count('{')
@@ -595,8 +605,12 @@ def varSearch(rootPath):
                                                 break
 
                                     #print "line "+line,
+                                    if ( func and  not funcName in inStructFunc ):
+                                        while( not re.findall("^.*;\s*", line) ):
+                                            print line,
+                                            line = inF.next()
+                                    print "nxt :"+line,
                                     line = inF.next()
-                                    lineCount += 1
 
                                 if ( secondMatch ):
                                     name = re.findall("([A-Za-z0-9_]+)\s*;", line)
@@ -609,6 +623,7 @@ def varSearch(rootPath):
                                                     preProcessorQ.pop()
                                             continue
                                         else:
+                                            print "Found "+name
                                             found = True
                                     else:
                                         for i in range( lineCount ):
@@ -619,7 +634,7 @@ def varSearch(rootPath):
                                 if ( not mcrCount ):
                                     dDefinition.append(qTemp)
 
-                                #print "qtemp "+str(varTemp)
+                                print "qtemp "+str(varTemp)
                                 extractVariables(varTemp, [], False) 
                                 fileContent.append(name)
                             
@@ -1169,11 +1184,11 @@ def main(argv) :
     ''' Has to be the root path of the code base '''
     path = "/Volumes/work/Phd/ECDH/kv_openssl/"
     ''' Name of the looked function '''
-    functionName = "ecdh_low"
+    functionName = "EC_GROUP"
 
-   recFuncSearch(path, functionName,".")
+ #   recFuncSearch(path, functionName,".")
  #   gVariable.append("EC_KEY_new_by_curve_name")
-#    gVariable.append("EC_GROUP")
+    gVariable.append("EC_GROUP")
     varSearch(path)
 
 ##    print str(gVariable)
