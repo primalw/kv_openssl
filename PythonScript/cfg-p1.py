@@ -292,9 +292,10 @@ def extractVariables(code, fList, cond ):
         ctype = clean(ctype)
         if ( not ( ctype.lower() in reserveWords or ctype in cDefinition or ctype in fList or ctype in gVariable or ctype in dFound or ctype in ignoreVar )):
             if ( not cond and ctype not in newDef ):
-                print "Type : "+ctype
+                print "Type : "+ctype.strip()
                 newDef.append(ctype)
-            cDefinition.append(ctype)
+            elif ( cond ):
+                gVariable.append(ctype.strip())
 
     for var in tempVariables:
         var = clean(var)
@@ -304,12 +305,13 @@ def extractVariables(code, fList, cond ):
                 newDef.append(var)
             elif ( cond ):
                 gVariable.append(var.strip())
-            cDefinition.append(var.strip())
 
 def varSearch(rootPath):
     ''' Recursively search for global variables and custom data types '''
     patterns = ["*.h","*.c", "*.cpp"]
     funcPattern = [ "^.*\(.*\*\s*(\S+)\)\s*\(.*", "^\s*[^\W]\S+.*[^\W]\s+\*?(\S+)\s*\(.*"]
+
+    print gVariable
     
     while True:
         for pattern in patterns:
@@ -333,7 +335,7 @@ def varSearch(rootPath):
                         fileContent = deque()
                         secondMatch = False
 
-                        #print "/* file: "+str(root) +"/" +str(filename)+" :"+str(lineNum)+" */"
+                        print "/* file: "+str(root) +"/" +str(filename)+" :"+str(lineNum)+" */"
 
                         for line in inF:
 
@@ -457,7 +459,7 @@ def varSearch(rootPath):
                             name = re.findall("^\s*#\s*define\s+([A-Za-z0-9_]+)\s+[\(A-Za-z0-9_]+\s*.*$", orgLine) 
                             if ( name ):
                                 name = name[0].strip()
-                                if ( name in gVariable or name in cDefinition ):
+                                if ( ( name in gVariable or name in newDef ) and not name in cDefinition ):
                                     varTemp = deque()
                                     tempCode.append(orgLine)
                                     varTemp.append(orgLine)
@@ -546,9 +548,12 @@ def varSearch(rootPath):
                             name = seg[0].strip()
                             if ( name ):
                                 secondMatch = False
-                                if ( name in gVariable or name in cDefinition or name in newDef):
+                                if ( ( name in gVariable or name in newDef ) and not name in cDefinition ):
                                     print "Found :"+name
+                                    print "gV "+str(gVariable)+" cD "+str(cDefinition)+" nD "+str(newDef)
                                     found = True
+                                elif ( name in cDefinition ):
+                                    continue
                                 else:
                                     if ( not ( "typedef" in orgLine or "struct" in orgLine ) ):
                                         continue
@@ -567,17 +572,17 @@ def varSearch(rootPath):
                                 funcName =  ""
                                 lineCount = 0
 
-                                print "start"
+                                print "start : "+str(found)+" "+name
                                 
                                 while True:
-                                    if ( "{" in line and not funcDefn ):
+                                    if ( "{" in line ):
                                         funcDefn = True
                                     func = False
                                     
                                     cmtS += line.count('/*')
                                     cmtE += line.count('*/')
 
-                                    if ( cmtS == cmtE or stripped(line).startswith("//") ):
+                                    if ( cmtS == cmtE and not stripped(line).startswith("//") ):
                                         for fpattern in funcPattern:
                                             funcName = re.findall(fpattern, line)
                                             if ( funcName ):
@@ -591,7 +596,7 @@ def varSearch(rootPath):
                                         else:
                                             qTemp.append(line)
 
-                                    if ( cmtS == cmtE or stripped(line).startswith("//") ):
+                                    if ( ( cmtS == cmtE and not stripped(line).startswith("//") ) or ( not stripped(line).startswith("/*") and not line.count("*/") and line.count("/*") )):
                                         if ( not func or ( func and funcName in inStructFunc ) ):
                                             varTemp.append(line)
                                         if ( funcDefn ):
@@ -604,22 +609,18 @@ def varSearch(rootPath):
                                             if ( re.findall("^.*;\s*", line) ):
                                                 break
 
-                                    #print "line "+line,
                                     if ( func and  not funcName in inStructFunc ):
                                         while( not re.findall("^.*;\s*", line) ):
-                                            print line,
                                             line = inF.next()
-                                    print "nxt :"+line,
                                     line = inF.next()
 
                                 if ( secondMatch ):
                                     name = re.findall("([A-Za-z0-9_]+)\s*;", line)
                                     if ( name ):
                                         name = name[0]
-##                                        print "line "+line,
-                                        if ( name and not ( name in gVariable or name in cDefinition or name in newDef ) ):
-                                            for i in range( lineCount ):
-                                                if ( mcrCount ):
+                                        if ( name and ( not ( name in gVariable or name in newDef ) or name in cDefinition ) ):
+                                            if ( mcrCount ):
+                                                for i in range( lineCount ):
                                                     preProcessorQ.pop()
                                             continue
                                         else:
@@ -642,11 +643,10 @@ def varSearch(rootPath):
                             name = fileContent.popleft()
                             if ( name in gVariable ):
                                 gVariable.remove(name)
-                            elif ( name in cDefinition ):
-                                cDefinition.remove(name)
                             elif ( name in newDef ):
                                 newDef.remove(name)
-
+                            cDefinition.append(name)
+        
         if ( len(newDef) ):
             gVariable.clear()
             for i in range( len(newDef) ):
