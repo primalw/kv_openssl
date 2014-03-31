@@ -831,6 +831,12 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                 found = True
                                 done = True
                                 funcMap.add(funcName)
+
+                                tempCode = deque()
+                                tempCode.append(orgLine)
+                                tempFlist = []
+                                tempFlist.append(funcName)
+                                extractVariables(tempCode, tempFlist, False)
                                 
                                 if ( mcrCount ):
                                     continue
@@ -842,7 +848,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                 regex = '^\s*#\s*define\s(\S+)\s*\(.*'
                             else:
                                 regex = '^\s*[^\W]\S+.*[^\W]\s+\*?(\S+)\s*\(.*'
-                                
+
                             match = re.findall(regex, orgLine)
                             if ( match and ( match[0] == funcName or ( match[0].count("(") and ( match[0].split("(",2)[0] == funcName ) ) ) ):
 
@@ -1256,11 +1262,11 @@ def main(argv) :
     ''' Has to be the root path of the code base '''
     path = "/Volumes/work/Phd/ECDH/kv_openssl/"
     ''' Name of the looked function '''
-    functionName = "ecdh_low"
+    functionName = "STORE_HANDLE_OBJECT_FUNC_PTR"
 
     recFuncSearch(path, functionName,".")
  #   gVariable.append("EC_KEY_new_by_curve_name")
- #   gVariable.append("EC_GROUP")
+ #   gVariable.append("EVP_PKEY")
     varSearch(path)
 
 ##    print str(gVariable)
@@ -1269,7 +1275,7 @@ def main(argv) :
 ##    print len(fDeclaration)
 
     ''' Writing all the header declarations '''
-    if ( len(dDefinition) ):
+    if ( len(dDefinition) or len(fDeclaration)  ):
         thefile = open(functionName+".h",'w')
 
         for i in range( len(dDefinition) ):
