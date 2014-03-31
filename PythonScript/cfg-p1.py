@@ -1059,7 +1059,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
     else:
         ''' Generic function header is found '''
         fHdrCln = fHdr.split("(")[0]
-        #print fHdrCln
+        print fHdrCln
         found = False
         fDeclaration.append("\n")
         
@@ -1256,11 +1256,11 @@ def main(argv) :
     ''' Has to be the root path of the code base '''
     path = "/Volumes/work/Phd/ECDH/kv_openssl/"
     ''' Name of the looked function '''
-    functionName = "EC_GROUP"
+    functionName = "ecdh_low"
 
- #   recFuncSearch(path, functionName,".")
+    recFuncSearch(path, functionName,".")
  #   gVariable.append("EC_KEY_new_by_curve_name")
-    gVariable.append("EC_GROUP")
+ #   gVariable.append("EC_GROUP")
     varSearch(path)
 
 ##    print str(gVariable)
