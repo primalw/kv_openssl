@@ -90,29 +90,6 @@
 #define ASN1_R_UNSUPPORTED_TYPE				 196
 
 #ifndef HEADER_OPENSSL_TYPES_H
-#ifdef NO_ASN1_TYPEDEFS
-#define ASN1_ENUMERATED		ASN1_STRING
-#define ASN1_BIT_STRING		ASN1_STRING
-#define ASN1_PRINTABLESTRING	ASN1_STRING
-#define ASN1_T61STRING		ASN1_STRING
-#define ASN1_GENERALSTRING	ASN1_STRING
-#define ASN1_UNIVERSALSTRING	ASN1_STRING
-#define ASN1_BMPSTRING		ASN1_STRING
-#define ASN1_VISIBLESTRING	ASN1_STRING
-#define ASN1_UTF8STRING		ASN1_STRING
-#define ASN1_BOOLEAN		int
-#else
-typedef struct asn1_string_st ASN1_ENUMERATED;
-typedef struct asn1_string_st ASN1_BIT_STRING;
-typedef struct asn1_string_st ASN1_PRINTABLESTRING;
-typedef struct asn1_string_st ASN1_T61STRING;
-typedef struct asn1_string_st ASN1_GENERALSTRING;
-typedef struct asn1_string_st ASN1_UNIVERSALSTRING;
-typedef struct asn1_string_st ASN1_BMPSTRING;
-typedef struct asn1_string_st ASN1_VISIBLESTRING;
-typedef struct asn1_string_st ASN1_UTF8STRING;
-typedef int ASN1_BOOLEAN;
-#endif
 typedef struct buf_mem_st BUF_MEM;
 typedef struct dh_method DH_METHOD;
 typedef struct dsa_method DSA_METHOD;
@@ -166,19 +143,37 @@ typedef struct store_method_st STORE_METHOD;
 #ifndef HEADER_OPENSSL_TYPES_H
 #ifdef NO_ASN1_TYPEDEFS
 #define ASN1_INTEGER		ASN1_STRING
+#define ASN1_ENUMERATED		ASN1_STRING
+#define ASN1_BIT_STRING		ASN1_STRING
 #define ASN1_OCTET_STRING	ASN1_STRING
+#define ASN1_PRINTABLESTRING	ASN1_STRING
+#define ASN1_T61STRING		ASN1_STRING
 #define ASN1_IA5STRING		ASN1_STRING
 #define ASN1_UTCTIME		ASN1_STRING
 #define ASN1_GENERALIZEDTIME	ASN1_STRING
-#define ASN1_TIME		ASN1_STRING
+#define ASN1_GENERALSTRING	ASN1_STRING
+#define ASN1_UNIVERSALSTRING	ASN1_STRING
+#define ASN1_BMPSTRING		ASN1_STRING
+#define ASN1_VISIBLESTRING	ASN1_STRING
+#define ASN1_UTF8STRING		ASN1_STRING
+#define ASN1_BOOLEAN		int
 #else
 typedef struct asn1_string_st ASN1_INTEGER;
+typedef struct asn1_string_st ASN1_ENUMERATED;
+typedef struct asn1_string_st ASN1_BIT_STRING;
 typedef struct asn1_string_st ASN1_OCTET_STRING;
+typedef struct asn1_string_st ASN1_PRINTABLESTRING;
+typedef struct asn1_string_st ASN1_T61STRING;
 typedef struct asn1_string_st ASN1_IA5STRING;
+typedef struct asn1_string_st ASN1_GENERALSTRING;
+typedef struct asn1_string_st ASN1_UNIVERSALSTRING;
+typedef struct asn1_string_st ASN1_BMPSTRING;
 typedef struct asn1_string_st ASN1_UTCTIME;
-typedef struct asn1_string_st ASN1_TIME;
 typedef struct asn1_string_st ASN1_GENERALIZEDTIME;
+typedef struct asn1_string_st ASN1_VISIBLESTRING;
+typedef struct asn1_string_st ASN1_UTF8STRING;
 typedef struct asn1_string_st ASN1_STRING;
+typedef int ASN1_BOOLEAN;
 #endif
 typedef struct bignum_st BIGNUM;
 typedef struct bignum_ctx BN_CTX;
@@ -380,6 +375,52 @@ struct X509_POLICY_DATA_st
 #ifndef HEADER_MD2_H
 #define MD2_DIGEST_LENGTH	16
 #endif
+
+EVP_PKEY *pkey;
+
+#ifndef HEADER_ENVELOPE_H
+struct evp_pkey_st
+{
+	int type;
+	int save_type;
+	int references;
+	const EVP_PKEY_ASN1_METHOD *ameth;
+	ENGINE *engine;
+	union	{
+		char *ptr;
+#ifndef OPENSSL_NO_RSA
+		struct rsa_st *rsa;	/* RSA */
+#endif
+#ifndef OPENSSL_NO_DSA
+		struct dsa_st *dsa;	/* DSA */
+#endif
+#ifndef OPENSSL_NO_DH
+		struct dh_st *dh;	/* DH */
+#endif
+#ifndef OPENSSL_NO_EC
+		struct ec_key_st *ec;	/* ECC */
+#endif
+	} pkey;
+	int save_parameters;
+	STACK_OF(X509_ATTRIBUTE) *attributes; /* [ 0 ] */
+} /* EVP_PKEY */;
+#ifndef OPENSSL_NO_RSA
+struct rsa_st;
+#endif
+#ifndef OPENSSL_NO_DSA
+struct dsa_st;
+#endif
+#ifndef OPENSSL_NO_DH
+struct dh_st;
+#endif
+#ifndef OPENSSL_NO_EC
+struct ec_key_st;
+#endif
+#endif
+
+#ifndef HEADER_OPENSSL_TYPES_H
+typedef struct evp_pkey_st EVP_PKEY;
+#endif /* def HEADER_OPENSSL_TYPES_H */
 
 #ifndef HEADER_ENVELOPE_H
 #ifndef EVP_MD
@@ -2589,10 +2630,6 @@ typedef struct
 #define ASN1_GEN_FORMAT_HEX	3
 #define ASN1_GEN_FORMAT_BITLIST	4
 
-
-
-
-
 static unsigned long global_mask = 0xFFFFFFFFL;
 
 #if (defined(_WIN32) || defined(_WIN64)) && !defined(__MINGW32__)
@@ -3093,20 +3130,6 @@ struct evp_pkey_method_st
 	{
 	int pkey_id;
 	int flags;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 	} /* EVP_PKEY_METHOD */;
 
 #define EVP_PKEY_FLAG_DYNAMIC	1
