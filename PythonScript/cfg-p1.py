@@ -836,7 +836,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                 tempCode.append(orgLine)
                                 tempFlist = []
                                 tempFlist.append(funcName)
-                                extractVariables(tempCode, tempFlist, False)
+                                extractVariables(tempCode, tempFlist, True)
                                 
                                 if ( mcrCount ):
                                     continue

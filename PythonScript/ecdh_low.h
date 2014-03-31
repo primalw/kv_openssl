@@ -1186,6 +1186,70 @@ t=(BN_ULLONG)w * (a) + (r) + (c); \
 #define BN_is_odd(a)	    (((a)->top > 0) && ((a)->d[0] & 1))
 #endif
 
+/* file: sk_CONF_VALUE_num : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#ifndef HEADER_SAFESTACK_H
+#define sk_CONF_VALUE_num(st) SKM_sk_num(CONF_VALUE, (st))
+#endif /* !defined HEADER_SAFESTACK_H */
+
+/* file: sk_CONF_VALUE_value : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#ifndef HEADER_SAFESTACK_H
+#define sk_CONF_VALUE_value(st, i) SKM_sk_value(CONF_VALUE, (st), (i))
+#endif /* !defined HEADER_SAFESTACK_H */
+
+/* file: sk_CRYPTO_dynlock_num : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#ifndef HEADER_SAFESTACK_H
+#define sk_CRYPTO_dynlock_num(st) SKM_sk_num(CRYPTO_dynlock, (st))
+#endif /* !defined HEADER_SAFESTACK_H */
+
+/* file: sk_CRYPTO_dynlock_value : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#ifndef HEADER_SAFESTACK_H
+#define sk_CRYPTO_dynlock_value(st, i) SKM_sk_value(CRYPTO_dynlock, (st), (i))
+#endif /* !defined HEADER_SAFESTACK_H */
+
+/* file: OPENSSL_assert : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
+#ifndef HEADER_CRYPTO_H
+#define OPENSSL_assert(e)       (void)((e) ? 0 : (OpenSSLDie(__FILE__, __LINE__, #e),1))
+#endif
+
+/* file: ERR_GET_REASON : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+#ifndef HEADER_ERR_H
+#define ERR_GET_REASON(l)	(int)((l)&0xfffL)
+#endif
+
+/* file: RANDerr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+#ifndef HEADER_ERR_H
+#define RANDerr(f,r) ERR_PUT_error(ERR_LIB_RAND,(f),(r),__FILE__,__LINE__)
+#endif
+
+/* file: EC_window_bits_for_scalar_size : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_mult.c */
+#define EC_window_bits_for_scalar_size(b) \
+((size_t) \
+((b) >= 2000 ? 6 : \
+(b) >=  800 ? 5 : \
+(b) >=  300 ? 4 : \
+(b) >=   70 ? 3 : \
+(b) >=   20 ? 2 : \
+1))
+
+/* file: ECDHerr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+#ifndef HEADER_ERR_H
+#define ECDHerr(f,r)  ERR_PUT_error(ERR_LIB_ECDH,(f),(r),__FILE__,__LINE__)
+#endif
+
+/* file: DHerr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+#ifndef HEADER_ERR_H
+#define DHerr(f,r)   ERR_PUT_error(ERR_LIB_DH,(f),(r),__FILE__,__LINE__)
+#endif
+
+/* file: CTXDBG_ENTRY : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
+#ifdef BN_CTX_DEBUG
+#define CTXDBG_ENTRY(str, ctx)	do { \
+ctxdbg_cur = (str); \
+fprintf(stderr,"Starting %s\n", ctxdbg_cur); \
+ctxdbg(ctx); \
+} while(0)
+#endif	
+
 #define V_ASN1_UNIVERSAL		0x00
 #define V_ASN1_PRIVATE			0xc0
 #define V_ASN1_CONSTRUCTED		0x20
@@ -1688,7 +1752,7 @@ const char *sname;		/* Structure name */
 #ifndef OPENSSL_NO_KRB5
 #if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_WIN32)
 static int krb5_loaded = 0;     /* only attempt to initialize func ptrs once */
-                          krb5_const krb5_flags F,
+/*                          krb5_const krb5_flags F,
                           krb5_data  * pD1,
                           krb5_creds  * pC,
                           krb5_data  * pD2)
@@ -1737,6 +1801,8 @@ static int krb5_loaded = 0;     /* only attempt to initialize func ptrs once */
 	else
 		return KRB5KRB_ERR_GENERIC;
 	}
+	}*/
+	
 #ifndef NO_DEF_KRB5_CCACHE
 typedef	krb5_pointer	krb5_cc_cursor;	/* cursor for sequential lookup */
 #endif /* NO_DEF_KRB5_CCACHE */
@@ -2564,7 +2630,7 @@ typedef struct X
 
 #ifndef OPENSSL_NO_KRB5
 #if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_WIN32)
-                         krb5_ccache CC,
+   /*                      krb5_ccache CC,
                          krb5_creds  * pCR,
                          krb5_creds  ** ppCR)
 	{
@@ -2606,7 +2672,7 @@ typedef struct X
 		return(p_krb5_free_ticket(con,kt));
 	else
 		return KRB5KRB_ERR_GENERIC;
-	}
+	}*/
 #ifndef NO_DEF_KRB5_CCACHE
 typedef struct _krb5_ccache
 	{
@@ -2650,8 +2716,7 @@ typedef struct _krb5_cc_ops
 	} krb5_cc_ops;
 #endif /* NO_DEF_KRB5_CCACHE */
 #endif  /* OPENSSL_SYS_WINDOWS || OPENSSL_SYS_WIN32 */
-static krb5_error_code
-kssl_TKT2tkt(	/* IN     */	krb5_context	krb5context,
+static krb5_error_code kssl_TKT2tkt(	/* IN     */	krb5_context	krb5context,
 		/* IN     */	KRB5_TKTBODY	*asn1ticket,
 		/* OUT    */	krb5_ticket	**krb5ticket,
 		/* OUT    */	KSSL_ERR *kssl_err  )
@@ -2675,7 +2740,6 @@ kssl_TKT2tkt(	/* IN     */	krb5_context	krb5context,
 		kssl_err->reason = SSL_R_KRB5_S_RD_REQ;
 		return ENOMEM;		/*  or  KRB5KRB_ERR_GENERIC;	*/
 		}
-	return 0;
 #endif	/* !OPENSSL_NO_KRB5	*/
 
 
@@ -2828,7 +2892,6 @@ static int fips_drbg_type = OPENSSL_DRBG_DEFAULT_TYPE;
 static int fips_drbg_flags = OPENSSL_DRBG_DEFAULT_FLAGS;
 #endif
 
-
 static const RAND_METHOD *default_RAND_meth = NULL;
 
 #ifndef OPENSSL_NO_ENGINE
@@ -2843,10 +2906,6 @@ typedef struct added_obj_st
 	int type;
 	ASN1_OBJECT *obj;
 	} ADDED_OBJ;
-
-
-
-
 
 #ifndef OPENSSL_NO_OBJECT
 #else
@@ -2920,173 +2979,6 @@ typedef struct st_engine_pile
 
 #ifndef HAVE_CRYPTODEV
 #else 
-    const unsigned char *in, size_t inl)
-{
-	struct crypt_op cryp;
-	struct dev_crypto_state *state = ctx->cipher_data;
-	struct session_op *sess = &state->d_sess;
-	const void *iiv;
-	unsigned char save_iv[EVP_MAX_IV_LENGTH];
-
-	if (state->d_fd < 0)
-		return (0);
-	if (!inl)
-		return (1);
-	if ((inl % ctx->cipher->block_size) != 0)
-		return (0);
-
-	memset(&cryp, 0, sizeof(cryp));
-
-	cryp.ses = sess->ses;
-	cryp.flags = 0;
-	cryp.len = inl;
-	cryp.mac = 0;
-
-	cryp.op = ctx->encrypt ? COP_ENCRYPT : COP_DECRYPT;
-
-	if (ctx->cipher->iv_len) {
-		if (!ctx->encrypt) {
-			iiv = in + inl - ctx->cipher->iv_len;
-			memcpy(save_iv, iiv, ctx->cipher->iv_len);
-		}
-	} else
-		cryp.iv = NULL;
-
-	if (ioctl(state->d_fd, CIOCCRYPT, &cryp) == -1) {
-		/* XXX need better errror handling
-		 * this can fail for a number of different reasons.
-		 */
-		return (0);
-	}
-
-	if (ctx->cipher->iv_len) {
-		if (ctx->encrypt)
-			iiv = out + inl - ctx->cipher->iv_len;
-		else
-			iiv = save_iv;
-		memcpy(ctx->iv, iiv, ctx->cipher->iv_len);
-	}
-	return (1);
-}
-    const unsigned char *iv, int enc)
-{
-	struct dev_crypto_state *state = ctx->cipher_data;
-	struct session_op *sess = &state->d_sess;
-	int cipher = -1, i;
-
-	for (i = 0; ciphers[i].id; i++)
-		if (ctx->cipher->nid == ciphers[i].nid &&
-		    ctx->cipher->iv_len <= ciphers[i].ivmax &&
-		    ctx->key_len == ciphers[i].keylen) {
-			cipher = ciphers[i].id;
-			break;
-		}
-
-	if (!ciphers[i].id) {
-		state->d_fd = -1;
-		return (0);
-	}
-
-	memset(sess, 0, sizeof(struct session_op));
-
-	if ((state->d_fd = get_dev_crypto()) < 0)
-		return (0);
-
-	sess->keylen = ctx->key_len;
-	sess->cipher = cipher;
-
-	if (ioctl(state->d_fd, CIOCGSESSION, sess) == -1) {
-		put_dev_crypto(state->d_fd);
-		state->d_fd = -1;
-		return (0);
-	}
-	return (1);
-}
-	struct dev_crypto_state *state = ctx->cipher_data;
-	struct session_op *sess = &state->d_sess;
-    const int **nids, int nid)
-{
-	if (!cipher)
-
-	switch (nid) {
-	case NID_rc4:
-		*cipher = &cryptodev_rc4;
-		break;
-	case NID_des_ede3_cbc:
-		*cipher = &cryptodev_3des_cbc;
-		break;
-	case NID_des_cbc:
-		*cipher = &cryptodev_des_cbc;
-		break;
-	case NID_bf_cbc:
-		*cipher = &cryptodev_bf_cbc;
-		break;
-	case NID_cast5_cbc:
-		*cipher = &cryptodev_cast_cbc;
-		break;
-	case NID_aes_128_cbc:
-		*cipher = &cryptodev_aes_cbc;
-		break;
-	case NID_aes_192_cbc:
-		*cipher = &cryptodev_aes_192_cbc;
-		break;
-	case NID_aes_256_cbc:
-		*cipher = &cryptodev_aes_256_cbc;
-		break;
-	default:
-		*cipher = NULL;
-		break;
-	}
-	return (*cipher != NULL);
-}
-    const int **nids, int nid)
-{
-	if (!digest)
-
-	switch (nid) {
-#ifdef USE_CRYPTODEV_DIGESTS
-	case NID_md5:
-		*digest = &cryptodev_md5; 
-		break;
-	case NID_sha1:
-		*digest = &cryptodev_sha1;
- 		break;
-	default:
-#endif /* USE_CRYPTODEV_DIGESTS */
-		*digest = NULL;
-		break;
-	}
-	return (*digest != NULL);
-}
-    BIGNUM *u1, BIGNUM *pub_key, BIGNUM *u2, BIGNUM *p,
-    BN_CTX *ctx, BN_MONT_CTX *mont)
-{
-	BIGNUM t2;
-	int ret = 0;
-
-	BN_init(&t2);
-
-	/* v = ( g^u1 * y^u2 mod p ) mod q */
-	/* let t1 = g ^ u1 mod p */
-	ret = 0;
-
-	if (!dsa->meth->bn_mod_exp(dsa,t1,dsa->g,u1,dsa->p,ctx,mont))
-		goto err;
-
-	/* let t2 = y ^ u2 mod p */
-	if (!dsa->meth->bn_mod_exp(dsa,&t2,dsa->pub_key,u2,dsa->p,ctx,mont))
-		goto err;
-	/* let u1 = t1 * t2 mod p */
-	if (!BN_mod_mul(u1,t1,&t2,dsa->p,ctx))
-		goto err;
-
-	BN_copy(t1,u1);
-
-	ret = 1;
-err:
-	BN_free(&t2);
-	return(ret);
-}
 #endif /* HAVE_CRYPTODEV */
 
 static const ECDH_METHOD *default_ECDH_method = NULL;
@@ -4922,113 +4814,6 @@ typedef struct bignum_pool_item
 #define BN_CTX_POOL_SIZE	16
 #define BN_CTX_START_FRAMES	32
 
-
-    int flags)
-{
-    int signvalue = 0;
-    LDOUBLE ufvalue;
-    char iconvert[20];
-    char fconvert[20];
-    int iplace = 0;
-    int fplace = 0;
-    int padlen = 0;
-    int zpadlen = 0;
-    int caps = 0;
-    long intpart;
-    long fracpart;
-    long max10;
-
-    if (max < 0)
-        max = 6;
-    ufvalue = abs_val(fvalue);
-    if (fvalue < 0)
-        signvalue = '-';
-
-
-    /* sorry, we only support 9 digits past the decimal because of our
-       conversion method */
-    if (max > 9)
-        max = 9;
-
-    /* we "cheat" by converting the fractional part to integer by
-       multiplying by a factor of 10 */
-    max10 = roundv(pow_10(max));
-    fracpart = roundv(pow_10(max) * (ufvalue - intpart));
-
-    if (fracpart >= max10) {
-        intpart++;
-        fracpart -= max10;
-    }
-
-    /* convert integer part */
-    do {
-        iconvert[iplace++] =
-            (caps ? "0123456789ABCDEF"
-              : "0123456789abcdef")[intpart % 10];
-    } while (intpart && (iplace < (int)sizeof(iconvert)));
-    if (iplace == sizeof iconvert)
-        iplace--;
-    iconvert[iplace] = 0;
-
-    /* convert fractional part */
-    do {
-        fconvert[fplace++] =
-            (caps ? "0123456789ABCDEF"
-              : "0123456789abcdef")[fracpart % 10];
-    } while (fplace < max);
-    if (fplace == sizeof fconvert)
-        fplace--;
-    fconvert[fplace] = 0;
-
-    /* -1 for decimal point, another -1 if we are printing a sign */
-    zpadlen = max - fplace;
-    if (zpadlen < 0)
-        zpadlen = 0;
-    if (padlen < 0)
-        padlen = 0;
-    if (flags & DP_F_MINUS)
-        padlen = -padlen;
-
-    if ((flags & DP_F_ZERO) && (padlen > 0)) {
-        if (signvalue) {
-            doapr_outch(sbuffer, buffer, currlen, maxlen, signvalue);
-            --padlen;
-            signvalue = 0;
-        }
-        while (padlen > 0) {
-            doapr_outch(sbuffer, buffer, currlen, maxlen, '0');
-            --padlen;
-        }
-    }
-    while (padlen > 0) {
-        doapr_outch(sbuffer, buffer, currlen, maxlen, ' ');
-        --padlen;
-    }
-    if (signvalue)
-        doapr_outch(sbuffer, buffer, currlen, maxlen, signvalue);
-
-    while (iplace > 0)
-        doapr_outch(sbuffer, buffer, currlen, maxlen, iconvert[--iplace]);
-
-    /*
-     * Decimal point. This should probably use locale to find the correct
-     * char to print out.
-     */
-
-        while (fplace > 0)
-            doapr_outch(sbuffer, buffer, currlen, maxlen, fconvert[--fplace]);
-    }
-    while (zpadlen > 0) {
-        doapr_outch(sbuffer, buffer, currlen, maxlen, '0');
-        --zpadlen;
-    }
-
-    while (padlen < 0) {
-        doapr_outch(sbuffer, buffer, currlen, maxlen, ' ');
-        ++padlen;
-    }
-}
-
 static LDOUBLE
 pow_10(int in_exp)
 {
@@ -5049,7 +4834,17 @@ abs_val(LDOUBLE value)
     return result;
 }
 
-    int flags)
+static void
+fmtint(
+	   char **sbuffer,
+	   char **buffer,
+	   size_t *currlen,
+	   size_t *maxlen,
+	   LLONG value,
+	   int base,
+	   int min,
+	   int max,
+	   int flags)
 {
     int signvalue = 0;
     const char *prefix = "";
@@ -5132,6 +4927,14 @@ abs_val(LDOUBLE value)
     return;
 }
 
+static void
+_dopr(
+	  char **sbuffer,
+	  char **buffer,
+	  size_t *maxlen,
+	  size_t *retlen,
+	  int *truncated,
+	  const char *format,
     va_list args)
 {
     char ch;
@@ -5743,9 +5546,10 @@ X509V3_CONF_METHOD *db_meth;
 void *db;
 /* Maybe more here */
 };
-typedef struct v3_ext_method X509V3_EXT_METHOD;
-typedef struct GENERAL_NAME_st {
 
+typedef struct v3_ext_method X509V3_EXT_METHOD;
+
+typedef struct GENERAL_NAME_st {
 int type;
 union {
 	char *ptr;
@@ -5797,7 +5601,6 @@ struct X509_name_st
 	unsigned char *canon_enc;
 	int canon_enclen;
 	} /* X509_NAME */;
-					 X509_EXTENSION *ex, int loc);
 #endif
 
 #ifndef HEADER_STACK_H
@@ -5818,6 +5621,7 @@ typedef char *OPENSSL_STRING;
 #ifndef HEADER_RAND_H
 struct rand_meth_st
 	{
+		int a; /* temp fix */
 	};
 #endif
 
@@ -6131,7 +5935,7 @@ typedef struct
 	char *name;
 	char *value;
 	} CONF_VALUE;
-				       const char *section);
+const char *section);
 #endif
 
 #ifndef HEADER_BUFFER_H
@@ -6804,7 +6608,9 @@ ASN1_OBJECT *c2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp, 	     lo
 
  if (a != NULL) (*a)=ret; 	*pp=p;
  return(ret); err:
- ASN1err(ASN1_F_C2I_ASN1_OBJECT,i);  if ((ret != NULL) && ((a == NULL) || (*a != ret)))   ASN1_OBJECT_free(ret);  return(NULL); 	}
+ ASN1err(ASN1_F_C2I_ASN1_OBJECT,i);  if ((ret != NULL) && ((a == NULL) || (*a != ret)))   ASN1_OBJECT_free(ret);  return(NULL); 	
+ }
+
 /* file: ASN1_OBJECT_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_object.c */
 ASN1_OBJECT *ASN1_OBJECT_new(void) 	{
 	ASN1_OBJECT *ret;
@@ -6925,16 +6731,6 @@ static int do_dirname(GENERAL_NAME *gen, char *value, X509V3_CTX *ctx);
 int X509V3_NAME_from_section(X509_NAME *nm, STACK_OF(CONF_VALUE)*dn_sk,
 						unsigned long chtype);
 #endif
-
-/* file: sk_CONF_VALUE_num : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
-#ifndef HEADER_SAFESTACK_H
-#define sk_CONF_VALUE_num(st) SKM_sk_num(CONF_VALUE, (st))
-#endif /* !defined HEADER_SAFESTACK_H */
-
-/* file: sk_CONF_VALUE_value : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
-#ifndef HEADER_SAFESTACK_H
-#define sk_CONF_VALUE_value(st, i) SKM_sk_value(CONF_VALUE, (st), (i))
-#endif /* !defined HEADER_SAFESTACK_H */
 
 /* file: X509_NAME_add_entry_by_txt : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509x509.h */
 #ifndef HEADER_X509_H
@@ -7275,7 +7071,6 @@ ASN1_INTEGER *BN_to_ASN1_INTEGER(const BIGNUM *bn, ASN1_INTEGER *ai);
 int	BN_bn2bin(const BIGNUM *a, unsigned char *to);
 #endif
 
-
 /* file: ASN1_STRING_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1_lib.c */
 ASN1_STRING *ASN1_STRING_new(void) 	{
  return(ASN1_STRING_type_new(V_ASN1_OCTET_STRING)); 	}
@@ -7310,20 +7105,6 @@ unsigned char *string_to_hex(const char *str, long *len);
 struct CRYPTO_dynlock_value *CRYPTO_get_dynlock_value(int i);
 #endif
 
-/* file: sk_CRYPTO_dynlock_num : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
-#ifndef HEADER_SAFESTACK_H
-#define sk_CRYPTO_dynlock_num(st) SKM_sk_num(CRYPTO_dynlock, (st))
-#endif /* !defined HEADER_SAFESTACK_H */
-
-/* file: sk_CRYPTO_dynlock_value : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
-#ifndef HEADER_SAFESTACK_H
-#define sk_CRYPTO_dynlock_value(st, i) SKM_sk_value(CRYPTO_dynlock, (st), (i))
-#endif /* !defined HEADER_SAFESTACK_H */
-
-/* file: OPENSSL_assert : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
-#ifndef HEADER_CRYPTO_H
-#define OPENSSL_assert(e)       (void)((e) ? 0 : (OpenSSLDie(__FILE__, __LINE__, #e),1))
-#endif
 /* file: OpenSSLDie : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
 #ifndef HEADER_CRYPTO_H
 void OpenSSLDie(const char *file,int line,const char *assertion);
@@ -7497,11 +7278,6 @@ int EC_GROUP_set_curve_GFp(EC_GROUP *group, const BIGNUM *p, const BIGNUM *a, co
 unsigned long ERR_peek_last_error(void);
 #endif
 
-/* file: ERR_GET_REASON : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
-#ifndef HEADER_ERR_H
-#define ERR_GET_REASON(l)	(int)((l)&0xfffL)
-#endif
-
 /* file: EC_GROUP_clear_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
 #ifndef HEADER_EC_H
 void EC_GROUP_clear_free(EC_GROUP *group);
@@ -7624,8 +7400,6 @@ void EC_GROUP_set_curve_name(EC_GROUP *group, int nid);
 void EC_KEY_free(EC_KEY *key);
 #endif
 
-
-
 /* file: EC_KEY_generate_key : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
 #ifndef HEADER_EC_H
 int EC_KEY_generate_key(EC_KEY *key);
@@ -7646,11 +7420,6 @@ void OPENSSL_init(void);
 #ifdef OPENSSL_FIPS
 int RAND_init_fips(void);
 #endif
-#endif
-
-/* file: RANDerr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
-#ifndef HEADER_ERR_H
-#define RANDerr(f,r) ERR_PUT_error(ERR_LIB_RAND,(f),(r),__FILE__,__LINE__)
 #endif
 
 /* file: drbg_get_adin : /Volumes/work/Phd/ECDH/kv_openssl/crypto/randrand_lib.c */
@@ -7791,15 +7560,7 @@ void *EC_EX_DATA_get_data(const EC_EXTRA_DATA *,
 int EC_POINT_cmp(const EC_GROUP *group, const EC_POINT *a, const EC_POINT *b, BN_CTX *ctx);
 #endif
 
-/* file: EC_window_bits_for_scalar_size : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_mult.c */
-#define EC_window_bits_for_scalar_size(b) \
-		((size_t) \
-		 ((b) >= 2000 ? 6 : \
-		  (b) >=  800 ? 5 : \
-		  (b) >=  300 ? 4 : \
-		  (b) >=   70 ? 3 : \
-		  (b) >=   20 ? 2 : \
-		  1))
+
 
 /* file: compute_wNAF : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_mult.c */
 static signed char *compute_wNAF(const BIGNUM *scalar, int w, size_t *ret_len) 	{
@@ -7976,10 +7737,7 @@ static ECDH_DATA *ECDH_DATA_new_method(ENGINE *engine) 	{
 		}
 #endif	
  return(ret); 	}
-/* file: ECDHerr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
-#ifndef HEADER_ERR_H
-#define ECDHerr(f,r)  ERR_PUT_error(ERR_LIB_ECDH,(f),(r),__FILE__,__LINE__)
-#endif
+
 
 /* file: ECDH_get_default_method : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecdhecdh.h */
 #ifndef HEADER_ECDH_H
@@ -8006,7 +7764,6 @@ const ECDH_METHOD *ENGINE_get_ECDH(const ENGINE *e);
 int CRYPTO_new_ex_data(int class_index, void *obj, CRYPTO_EX_DATA *ad);
 #endif
 
-
 /* file: EC_KEY_insert_key_method_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
 #ifndef HEADER_EC_H
 void *EC_KEY_insert_key_method_data(EC_KEY *key, void *data,
@@ -8028,23 +7785,11 @@ int EC_KEY_get_flags(const EC_KEY *key);
 /* file: compute_key : /Volumes/work/Phd/ECDH/kv_openssl/crypto/dhdh_key.c */
 static int compute_key(unsigned char *key, const BIGNUM *pub_key, DH *dh);
 
-/* file: DHerr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
-#ifndef HEADER_ERR_H
-#define DHerr(f,r)   ERR_PUT_error(ERR_LIB_DH,(f),(r),__FILE__,__LINE__)
-#endif
-
 /* file: BN_CTX_start : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
 #ifndef HEADER_BN_H
 void	BN_CTX_start(BN_CTX *ctx);
 #endif
-
-/* file: CTXDBG_ENTRY : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
-#ifdef BN_CTX_DEBUG
-#define CTXDBG_ENTRY(str, ctx)	do { \
-				ctxdbg_cur = (str); \
-				fprintf(stderr,"Starting %s\n", ctxdbg_cur); \
-				ctxdbg(ctx); \
-				} while(0)
+			
 /* file: ctxdbg : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
 static void ctxdbg(BN_CTX *ctx) 	{
 	unsigned int bnidx = 0, fpidx = 0;
@@ -8059,7 +7804,6 @@ static void ctxdbg(BN_CTX *ctx) 	{
 		fpidx++;
 		}
  fprintf(stderr,"\n"); 	}
-#endif
 
 
 /* file: BN_STACK_push : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
