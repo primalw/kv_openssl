@@ -1,5 +1,311 @@
 #include <stddef.h>
 #include <memory.h>
+#include <stdio.h>
+#include <time.h>
+
+#define STACK_OF(type) struct stack_st_##type
+
+#define V_ASN1_UNIVERSAL		0x00
+#define V_ASN1_PRIVATE			0xc0
+#define V_ASN1_CONSTRUCTED		0x20
+#define V_ASN1_PRIMITIVE_TAG		0x1f
+#define V_ASN1_NEG			0x100	/* negative flag */
+#define V_ASN1_BOOLEAN			1	/**/
+#define V_ASN1_INTEGER			2
+#define V_ASN1_NEG_INTEGER		(2 | V_ASN1_NEG)
+#define V_ASN1_BIT_STRING		3
+#define V_ASN1_OCTET_STRING		4
+#define V_ASN1_NULL			5
+#define V_ASN1_OBJECT			6
+#define V_ASN1_ENUMERATED		10
+#define V_ASN1_UTF8STRING		12
+#define V_ASN1_SEQUENCE			16
+#define V_ASN1_SET			17
+#define V_ASN1_NUMERICSTRING		18	/**/
+#define V_ASN1_PRINTABLESTRING		19
+#define V_ASN1_T61STRING		20
+#define V_ASN1_IA5STRING		22
+#define V_ASN1_UTCTIME			23
+#define V_ASN1_GENERALIZEDTIME		24	/**/
+#define V_ASN1_VISIBLESTRING		26	/* alias */
+#define V_ASN1_GENERALSTRING		27	/**/
+#define V_ASN1_UNIVERSALSTRING		28	/**/
+#define V_ASN1_BMPSTRING		30
+#define B_ASN1_PRINTABLESTRING	0x0002
+#define B_ASN1_T61STRING	0x0004
+#define B_ASN1_IA5STRING	0x0010
+#define B_ASN1_UNIVERSALSTRING	0x0100
+#define B_ASN1_BMPSTRING	0x0800
+#define MBSTRING_FLAG		0x1000
+#define MBSTRING_UTF8		(MBSTRING_FLAG)
+#define MBSTRING_ASC		(MBSTRING_FLAG|1)
+#define MBSTRING_BMP		(MBSTRING_FLAG|2)
+#define MBSTRING_UNIV		(MBSTRING_FLAG|4)
+#define ASN1_OBJECT_FLAG_DYNAMIC	 0x01	/* internal use */
+#define ASN1_OBJECT_FLAG_DYNAMIC_STRINGS 0x04	/* internal use */
+#define ASN1_OBJECT_FLAG_DYNAMIC_DATA 	 0x08	/* internal use */
+#define ASN1_STRING_FLAG_NDEF 0x010 
+#define STABLE_NO_MASK		0x02
+#define ASN1_F_A2D_ASN1_OBJECT				 100
+#define ASN1_F_ASN1_GENERATE_V3				 178
+#define ASN1_F_ASN1_GET_OBJECT				 114
+#define ASN1_F_ASN1_MBSTRING_NCOPY			 122
+#define ASN1_F_ASN1_OBJECT_NEW				 123
+#define ASN1_F_ASN1_STR2TYPE				 179
+#define ASN1_F_ASN1_STRING_SET				 186
+#define ASN1_F_ASN1_STRING_TYPE_NEW			 130
+#define ASN1_F_BN_TO_ASN1_INTEGER			 139
+#define ASN1_F_C2I_ASN1_OBJECT				 196
+#define ASN1_F_D2I_ASN1_OBJECT				 147
+#define ASN1_R_BUFFER_TOO_SMALL				 107
+#define ASN1_R_FIRST_NUM_TOO_LARGE			 122
+#define ASN1_R_HEADER_TOO_LONG				 123
+#define ASN1_R_ILLEGAL_BITSTRING_FORMAT			 175
+#define ASN1_R_ILLEGAL_BOOLEAN				 176
+#define ASN1_R_ILLEGAL_CHARACTERS			 124
+#define ASN1_R_ILLEGAL_FORMAT				 177
+#define ASN1_R_ILLEGAL_HEX				 178
+#define ASN1_R_ILLEGAL_INTEGER				 180
+#define ASN1_R_ILLEGAL_NULL_VALUE			 182
+#define ASN1_R_ILLEGAL_OBJECT				 183
+#define ASN1_R_ILLEGAL_TIME_VALUE			 184
+#define ASN1_R_INTEGER_NOT_ASCII_FORMAT			 185
+#define ASN1_R_INVALID_BMPSTRING_LENGTH			 129
+#define ASN1_R_INVALID_DIGIT				 130
+#define ASN1_R_INVALID_OBJECT_ENCODING			 216
+#define ASN1_R_INVALID_SEPARATOR			 131
+#define ASN1_R_INVALID_UNIVERSALSTRING_LENGTH		 133
+#define ASN1_R_INVALID_UTF8STRING			 134
+#define ASN1_R_LIST_ERROR				 188
+#define ASN1_R_MISSING_SECOND_NUMBER			 138
+#define ASN1_R_NOT_ASCII_FORMAT				 190
+#define ASN1_R_OBJECT_NOT_ASCII_FORMAT			 191
+#define ASN1_R_SECOND_NUMBER_TOO_LARGE			 147
+#define ASN1_R_SEQUENCE_OR_SET_NEEDS_CONFIG		 192
+#define ASN1_R_STRING_TOO_LONG				 151
+#define ASN1_R_STRING_TOO_SHORT				 152
+#define ASN1_R_TIME_NOT_ASCII_FORMAT			 193
+#define ASN1_R_TOO_LONG					 155
+#define ASN1_R_UNKNOWN_FORMAT				 160
+#define ASN1_R_UNSUPPORTED_TYPE				 196
+
+#ifndef HEADER_OPENSSL_TYPES_H
+#ifdef NO_ASN1_TYPEDEFS
+#define ASN1_ENUMERATED		ASN1_STRING
+#define ASN1_BIT_STRING		ASN1_STRING
+#define ASN1_PRINTABLESTRING	ASN1_STRING
+#define ASN1_T61STRING		ASN1_STRING
+#define ASN1_GENERALSTRING	ASN1_STRING
+#define ASN1_UNIVERSALSTRING	ASN1_STRING
+#define ASN1_BMPSTRING		ASN1_STRING
+#define ASN1_VISIBLESTRING	ASN1_STRING
+#define ASN1_UTF8STRING		ASN1_STRING
+#define ASN1_BOOLEAN		int
+#else
+typedef struct asn1_string_st ASN1_ENUMERATED;
+typedef struct asn1_string_st ASN1_BIT_STRING;
+typedef struct asn1_string_st ASN1_PRINTABLESTRING;
+typedef struct asn1_string_st ASN1_T61STRING;
+typedef struct asn1_string_st ASN1_GENERALSTRING;
+typedef struct asn1_string_st ASN1_UNIVERSALSTRING;
+typedef struct asn1_string_st ASN1_BMPSTRING;
+typedef struct asn1_string_st ASN1_VISIBLESTRING;
+typedef struct asn1_string_st ASN1_UTF8STRING;
+typedef int ASN1_BOOLEAN;
+#endif
+typedef struct buf_mem_st BUF_MEM;
+typedef struct dh_method DH_METHOD;
+typedef struct dsa_method DSA_METHOD;
+typedef struct rsa_meth_st RSA_METHOD;
+typedef struct ecdsa_method ECDSA_METHOD;
+typedef struct x509_st X509;
+typedef struct X509_crl_st X509_CRL;
+typedef struct store_method_st STORE_METHOD;
+#endif /* def HEADER_OPENSSL_TYPES_H */
+
+#define V_ASN1_UNIVERSAL		0x00
+#define V_ASN1_PRIVATE			0xc0
+#define V_ASN1_CONSTRUCTED		0x20
+#define V_ASN1_PRIMITIVE_TAG		0x1f
+#define V_ASN1_NEG			0x100	/* negative flag */
+#define V_ASN1_BOOLEAN			1	/**/
+#define V_ASN1_INTEGER			2
+#define V_ASN1_NEG_INTEGER		(2 | V_ASN1_NEG)
+#define V_ASN1_BIT_STRING		3
+#define V_ASN1_OCTET_STRING		4
+#define V_ASN1_NULL			5
+#define V_ASN1_OBJECT			6
+#define V_ASN1_ENUMERATED		10
+#define V_ASN1_UTF8STRING		12
+#define V_ASN1_SEQUENCE			16
+#define V_ASN1_SET			17
+#define V_ASN1_NUMERICSTRING		18	/**/
+#define V_ASN1_PRINTABLESTRING		19
+#define V_ASN1_T61STRING		20
+#define V_ASN1_IA5STRING		22
+#define V_ASN1_UTCTIME			23
+#define V_ASN1_GENERALIZEDTIME		24	/**/
+#define V_ASN1_VISIBLESTRING		26	/* alias */
+#define V_ASN1_GENERALSTRING		27	/**/
+#define V_ASN1_UNIVERSALSTRING		28	/**/
+#define V_ASN1_BMPSTRING		30
+#define B_ASN1_PRINTABLESTRING	0x0002
+#define B_ASN1_T61STRING	0x0004
+#define B_ASN1_IA5STRING	0x0010
+#define B_ASN1_UNIVERSALSTRING	0x0100
+#define B_ASN1_BMPSTRING	0x0800
+#define MBSTRING_FLAG		0x1000
+#define MBSTRING_UTF8		(MBSTRING_FLAG)
+#define MBSTRING_ASC		(MBSTRING_FLAG|1)
+#define MBSTRING_BMP		(MBSTRING_FLAG|2)
+#define MBSTRING_UNIV		(MBSTRING_FLAG|4)
+#define ASN1_OBJECT_FLAG_DYNAMIC	 0x01	/* internal use */
+#define ASN1_OBJECT_FLAG_DYNAMIC_STRINGS 0x04	/* internal use */
+#define ASN1_OBJECT_FLAG_DYNAMIC_DATA 	 0x08	/* internal use */
+
+#ifndef HEADER_OPENSSL_TYPES_H
+#ifdef NO_ASN1_TYPEDEFS
+#define ASN1_INTEGER		ASN1_STRING
+#define ASN1_OCTET_STRING	ASN1_STRING
+#define ASN1_IA5STRING		ASN1_STRING
+#define ASN1_UTCTIME		ASN1_STRING
+#define ASN1_GENERALIZEDTIME	ASN1_STRING
+#define ASN1_TIME		ASN1_STRING
+#else
+typedef struct asn1_string_st ASN1_INTEGER;
+typedef struct asn1_string_st ASN1_OCTET_STRING;
+typedef struct asn1_string_st ASN1_IA5STRING;
+typedef struct asn1_string_st ASN1_UTCTIME;
+typedef struct asn1_string_st ASN1_TIME;
+typedef struct asn1_string_st ASN1_GENERALIZEDTIME;
+typedef struct asn1_string_st ASN1_STRING;
+#endif
+typedef struct bignum_st BIGNUM;
+typedef struct bignum_ctx BN_CTX;
+typedef struct bn_mont_ctx_st BN_MONT_CTX;
+typedef struct evp_pkey_asn1_method_st EVP_PKEY_ASN1_METHOD;
+typedef struct evp_pkey_method_st EVP_PKEY_METHOD;
+typedef struct dh_st DH;
+typedef struct rand_meth_st RAND_METHOD;
+typedef struct ecdh_method ECDH_METHOD;
+typedef struct X509_name_st X509_NAME;
+typedef struct v3_ext_ctx X509V3_CTX;
+typedef struct engine_st ENGINE;
+#endif /* def HEADER_OPENSSL_TYPES_H */
+
+/* Modification 03 */
+#ifndef HEADER_OPENSSL_TYPES_H
+typedef struct env_md_st EVP_MD;
+typedef struct rsa_st RSA;
+#endif /* def HEADER_OPENSSL_TYPES_H */
+
+/* Modification 02 */
+typedef struct ASN1_VALUE_st ASN1_VALUE;
+
+#ifndef HEADER_OPENSSL_TYPES_H
+#ifdef NO_ASN1_TYPEDEFS
+#define ASN1_NULL		int
+#else
+typedef int ASN1_NULL;
+#endif
+typedef struct ASN1_ITEM_st ASN1_ITEM;
+typedef struct x509_revoked_st X509_REVOKED;
+typedef struct X509_pubkey_st X509_PUBKEY;
+#endif /* def HEADER_OPENSSL_TYPES_H */
+
+#ifndef HEADER_OPENSSL_TYPES_H
+typedef struct x509_store_st X509_STORE;
+#endif /* def HEADER_OPENSSL_TYPES_H */
+
+#ifndef HEADER_ASN1_H
+typedef struct ASN1_TEMPLATE_st ASN1_TEMPLATE;
+#endif
+
+typedef struct X509_POLICY_DATA_st X509_POLICY_DATA;
+
+typedef struct x509_lookup_st X509_LOOKUP;
+
+typedef struct bio_st BIO;
+
+#ifdef OPENSSL_FIPS
+#ifndef OPENSSL_DRBG_DEFAULT_TYPE
+#define OPENSSL_DRBG_DEFAULT_TYPE	NID_aes_256_ctr
+#endif
+#ifndef OPENSSL_DRBG_DEFAULT_FLAGS
+#define OPENSSL_DRBG_DEFAULT_FLAGS	DRBG_FLAG_CTR_USE_DF
+#endif 
+#endif
+
+
+#define STATE_SIZE	1023
+
+typedef struct asn1_object_st
+{
+	const char *sn,*ln;
+	int nid;
+	int length;
+	const unsigned char *data;	/* data remains const after init */
+	int flags;	/* Should we free this one */
+} ASN1_OBJECT;
+#define ASN1_STRING_FLAG_NDEF 0x010 
+struct asn1_string_st
+{
+	int length;
+	int type;
+	unsigned char *data;
+	/* The value of the following field depends on the type being
+	 * held.  It is mostly being used for BIT_STRING so if the
+	 * input data has a non-zero 'unused bits' value, it will be
+	 * handled correctly */
+	long flags;
+};
+
+#define STABLE_NO_MASK		0x02
+typedef struct asn1_string_table_st {
+	int nid;
+	long minsize;
+	long maxsize;
+	unsigned long mask;
+	unsigned long flags;
+} ASN1_STRING_TABLE;
+
+typedef struct asn1_type_st
+{
+	int type;
+	union	{
+		char *ptr;
+		ASN1_BOOLEAN		boolean;
+		ASN1_STRING *		asn1_string;
+		ASN1_OBJECT *		object;
+		ASN1_INTEGER *		integer;
+		ASN1_ENUMERATED *	enumerated;
+		ASN1_BIT_STRING *	bit_string;
+		ASN1_OCTET_STRING *	octet_string;
+		ASN1_PRINTABLESTRING *	printablestring;
+		ASN1_T61STRING *	t61string;
+		ASN1_IA5STRING *	ia5string;
+		ASN1_GENERALSTRING *	generalstring;
+		ASN1_BMPSTRING *	bmpstring;
+		ASN1_UNIVERSALSTRING *	universalstring;
+		ASN1_UTCTIME *		utctime;
+		ASN1_GENERALIZEDTIME *	generalizedtime;
+		ASN1_VISIBLESTRING *	visiblestring;
+		ASN1_UTF8STRING *	utf8string;
+		/* set and sequence are left complete and still
+		 * contain the set or sequence bytes */
+		ASN1_STRING *		set;
+		ASN1_STRING *		sequence;
+		ASN1_VALUE *		asn1_value;
+	} value;
+} ASN1_TYPE;
+
+#ifndef HEADER_BIO_H
+typedef struct bio_method_st
+{
+	int type;
+	const char *name;
+} BIO_METHOD;
+#endif
 
 #ifndef HEADER_X509V3_H
 typedef struct NOTICEREF_st {
@@ -28,16 +334,13 @@ typedef struct x509_lookup_method_st
 #define SSL_MAX_MASTER_KEY_LENGTH		48
 #endif
 
-#ifndef HEADER_OPENSSL_TYPES_H
-typedef struct x509_store_st X509_STORE;
-#endif /* def HEADER_OPENSSL_TYPES_H */
-
-#ifndef HEADER_BIO_H
-typedef struct bio_method_st
-	{
-	int type;
-	const char *name;
-	} BIO_METHOD;
+#ifndef HEADER_ASN1_H
+struct X509_algor_st;
+#ifndef OPENSSL_EXPORT_VAR_AS_FUNCTION
+typedef const ASN1_ITEM ASN1_ITEM_EXP;
+#else
+typedef const ASN1_ITEM * ASN1_ITEM_EXP(void);
+#endif
 #endif
 
 #ifndef HEADER_ASN1T_H
@@ -50,10 +353,6 @@ const char *field_name;		/* Field name */
 #endif
 ASN1_ITEM_EXP *item;		/* Relevant ASN1_ITEM or ASN1_ADB */
 };
-#endif
-
-#ifndef HEADER_ASN1_H
-typedef struct ASN1_TEMPLATE_st ASN1_TEMPLATE;
 #endif
 
 #ifndef HEADER_X509V3_H
@@ -75,43 +374,6 @@ struct X509_POLICY_DATA_st
 	STACK_OF(POLICYQUALINFO) *qualifier_set;
 	STACK_OF(ASN1_OBJECT) *expected_policy_set;
 	};
-
-typedef struct X509_POLICY_DATA_st X509_POLICY_DATA;
-
-#ifndef HEADER_X509_VFY_H
-typedef struct x509_object_st
-	{
-	/* one of the above types */
-	int type;
-	union	{
-		char *ptr;
-		X509 *x509;
-		X509_CRL *crl;
-		EVP_PKEY *pkey;
-		} data;
-	} X509_OBJECT;
-typedef struct x509_lookup_st X509_LOOKUP;
-typedef struct X509_VERIFY_PARAM_st
-	{
-	char *name;
-	time_t check_time;	/* Time to use */
-	unsigned long inh_flags; /* Inheritance flags */
-	unsigned long flags;	/* Various verify flags */
-	int purpose;		/* purpose to check untrusted certificates */
-	int trust;		/* trust setting to check */
-	int depth;		/* Verify depth */
-	STACK_OF(ASN1_OBJECT) *policies;	/* Permissible policies */
-	} X509_VERIFY_PARAM;
-struct x509_lookup_st
-	{
-	int init;			/* have we been started */
-	int skip;			/* don't use us. */
-	X509_LOOKUP_METHOD *method;	/* the functions */
-	char *method_data;		/* method data */
-
-	X509_STORE *store_ctx;	/* who owns us */
-	} /* X509_LOOKUP */;
-#endif
 
 #define NID_aes_256_ctr		906
 
@@ -143,7 +405,7 @@ EVP_PKEY *	EVP_PKEY_new(void);
 #endif
 
 #ifndef HEADER_BIO_H
-typedef struct bio_st BIO;
+
 struct bio_st
 	{
 	BIO_METHOD *method;
@@ -178,11 +440,6 @@ const char *sname;		/* Structure name */
 #endif
 };
 #endif
-
-#ifndef HEADER_OPENSSL_TYPES_H
-typedef struct env_md_st EVP_MD;
-typedef struct rsa_st RSA;
-#endif /* def HEADER_OPENSSL_TYPES_H */
 
 #ifndef OPENSSL_NO_KRB5
 #if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_WIN32)
@@ -260,19 +517,6 @@ kssl_map_enc(krb5_enctype enctype)
 		}
 	}
 #endif	/* !OPENSSL_NO_KRB5	*/
-
-#ifdef OPENSSL_FIPS
-#ifndef OPENSSL_DRBG_DEFAULT_TYPE
-#define OPENSSL_DRBG_DEFAULT_TYPE	NID_aes_256_ctr
-#endif
-#ifndef OPENSSL_DRBG_DEFAULT_FLAGS
-#define OPENSSL_DRBG_DEFAULT_FLAGS	DRBG_FLAG_CTR_USE_DF
-#endif 
-#endif
-
-
-#define STATE_SIZE	1023
-
 
 struct st_ERR_FNS
 	{
@@ -807,17 +1051,6 @@ struct ssl_ctx_st
 #define SSL_R_KRB5_S_RD_REQ				 292
 #endif
 
-#ifndef HEADER_OPENSSL_TYPES_H
-#ifdef NO_ASN1_TYPEDEFS
-#define ASN1_NULL		int
-#else
-typedef int ASN1_NULL;
-#endif
-typedef struct ASN1_ITEM_st ASN1_ITEM;
-typedef struct x509_revoked_st X509_REVOKED;
-typedef struct X509_pubkey_st X509_PUBKEY;
-#endif /* def HEADER_OPENSSL_TYPES_H */
-
 #ifndef HEADER_MDC2_H
 #define MDC2_DIGEST_LENGTH      16
 #endif
@@ -1077,15 +1310,6 @@ struct x509_crl_method_st
 	{
 	int flags;
 	};
-
-#ifndef HEADER_ASN1_H
-struct X509_algor_st;
-#ifndef OPENSSL_EXPORT_VAR_AS_FUNCTION
-typedef const ASN1_ITEM ASN1_ITEM_EXP;
-#else
-typedef const ASN1_ITEM * ASN1_ITEM_EXP(void);
-#endif
-#endif
 
 #ifndef HEADER_OPENSSL_TYPES_H
 typedef struct X509_algor_st X509_ALGOR;
@@ -2324,24 +2548,6 @@ abs_val(LDOUBLE value)
 #define DP_C_LDOUBLE    3
 #define DP_C_LLONG      4
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #ifdef HAVE_LONG_LONG
 # if defined(_WIN32) && !defined(__GNUC__)
 # define LLONG __int64
@@ -2584,6 +2790,7 @@ typedef struct X509_req_st
 	ASN1_BIT_STRING *signature;
 	int references;
 	} X509_REQ;
+
 struct x509_st
 	{
 	X509_CINF *cert_info;
@@ -2614,7 +2821,8 @@ struct x509_st
 	unsigned char sha1_hash[SHA_DIGEST_LENGTH];
 #endif
 	X509_CERT_AUX *aux;
-	} /* X509 */;
+	} x509 /* X509 */;
+					   
 struct X509_crl_st
 	{
 	/* actual signature */
@@ -2638,7 +2846,42 @@ struct X509_crl_st
 	STACK_OF(GENERAL_NAMES) *issuers;
 	const X509_CRL_METHOD *meth;
 	void *meth_data;
-	} /* X509_CRL */;
+	} X509_CRL /* X509_CRL */;
+#endif
+
+#ifndef HEADER_X509_VFY_H
+typedef struct x509_object_st
+{
+   /* one of the above types */
+   int type;
+   union	{
+	   char *ptr;
+	   X509 *x509;
+	   X509_CRL *crl;
+	   EVP_PKEY *pkey;
+   } data;
+} X509_OBJECT;
+
+typedef struct X509_VERIFY_PARAM_st
+{
+   char *name;
+   time_t check_time;	/* Time to use */
+   unsigned long inh_flags; /* Inheritance flags */
+   unsigned long flags;	/* Various verify flags */
+   int purpose;		/* purpose to check untrusted certificates */
+   int trust;		/* trust setting to check */
+   int depth;		/* Verify depth */
+   STACK_OF(ASN1_OBJECT) *policies;	/* Permissible policies */
+} X509_VERIFY_PARAM;
+struct x509_lookup_st
+{
+   int init;			/* have we been started */
+   int skip;			/* don't use us. */
+   X509_LOOKUP_METHOD *method;	/* the functions */
+   char *method_data;		/* method data */
+   
+   X509_STORE *store_ctx;	/* who owns us */
+} /* X509_LOOKUP */;
 #endif
 
 #ifndef HEADER_RSA_H
@@ -2660,40 +2903,6 @@ struct rsa_meth_st
  * implementations. */
 	};
 #endif
-
-#ifndef HEADER_OPENSSL_TYPES_H
-#ifdef NO_ASN1_TYPEDEFS
-#define ASN1_ENUMERATED		ASN1_STRING
-#define ASN1_BIT_STRING		ASN1_STRING
-#define ASN1_PRINTABLESTRING	ASN1_STRING
-#define ASN1_T61STRING		ASN1_STRING
-#define ASN1_GENERALSTRING	ASN1_STRING
-#define ASN1_UNIVERSALSTRING	ASN1_STRING
-#define ASN1_BMPSTRING		ASN1_STRING
-#define ASN1_VISIBLESTRING	ASN1_STRING
-#define ASN1_UTF8STRING		ASN1_STRING
-#define ASN1_BOOLEAN		int
-#else
-typedef struct asn1_string_st ASN1_ENUMERATED;
-typedef struct asn1_string_st ASN1_BIT_STRING;
-typedef struct asn1_string_st ASN1_PRINTABLESTRING;
-typedef struct asn1_string_st ASN1_T61STRING;
-typedef struct asn1_string_st ASN1_GENERALSTRING;
-typedef struct asn1_string_st ASN1_UNIVERSALSTRING;
-typedef struct asn1_string_st ASN1_BMPSTRING;
-typedef struct asn1_string_st ASN1_VISIBLESTRING;
-typedef struct asn1_string_st ASN1_UTF8STRING;
-typedef int ASN1_BOOLEAN;
-#endif
-typedef struct buf_mem_st BUF_MEM;
-typedef struct dh_method DH_METHOD;
-typedef struct dsa_method DSA_METHOD;
-typedef struct rsa_meth_st RSA_METHOD;
-typedef struct ecdsa_method ECDSA_METHOD;
-typedef struct x509_st X509;
-typedef struct X509_crl_st X509_CRL;
-typedef struct store_method_st STORE_METHOD;
-#endif /* def HEADER_OPENSSL_TYPES_H */
 
 #ifndef HEADER_ERR_H
 #define ERR_R_FATAL				64
@@ -2759,8 +2968,12 @@ union {
 	ASN1_TYPE *other; /* x400Address */
 } d;
 } GENERAL_NAME;
-				ASN1_BIT_STRING *bits,
-				STACK_OF(CONF_VALUE) *extlist);
+
+/* Modification - 1 */
+STACK_OF(CONF_VALUE) *i2v_ASN1_BIT_STRING(X509V3_EXT_METHOD *method,
+										 ASN1_BIT_STRING *bits,
+										 STACK_OF(CONF_VALUE) *extlist);
+					
 ASN1_INTEGER * s2i_ASN1_INTEGER(X509V3_EXT_METHOD *meth, char *value);
 #define X509V3_F_A2I_GENERAL_NAME			 164
 #define X509V3_F_DO_DIRNAME				 144
@@ -3375,240 +3588,15 @@ struct evp_pkey_asn1_method_st
 	char *info;
 
 
-
-
-
-
-
 	/* Legacy functions for old PEM */
 
 	/* Custom ASN1 signature verification */
 
 	} /* EVP_PKEY_ASN1_METHOD */;
 
-
-#define V_ASN1_UNIVERSAL		0x00
-#define V_ASN1_PRIVATE			0xc0
-#define V_ASN1_CONSTRUCTED		0x20
-#define V_ASN1_PRIMITIVE_TAG		0x1f
-#define V_ASN1_NEG			0x100	/* negative flag */
-#define V_ASN1_BOOLEAN			1	/**/
-#define V_ASN1_INTEGER			2
-#define V_ASN1_NEG_INTEGER		(2 | V_ASN1_NEG)
-#define V_ASN1_BIT_STRING		3
-#define V_ASN1_OCTET_STRING		4
-#define V_ASN1_NULL			5
-#define V_ASN1_OBJECT			6
-#define V_ASN1_ENUMERATED		10
-#define V_ASN1_UTF8STRING		12
-#define V_ASN1_SEQUENCE			16
-#define V_ASN1_SET			17
-#define V_ASN1_NUMERICSTRING		18	/**/
-#define V_ASN1_PRINTABLESTRING		19
-#define V_ASN1_T61STRING		20
-#define V_ASN1_IA5STRING		22
-#define V_ASN1_UTCTIME			23
-#define V_ASN1_GENERALIZEDTIME		24	/**/
-#define V_ASN1_VISIBLESTRING		26	/* alias */
-#define V_ASN1_GENERALSTRING		27	/**/
-#define V_ASN1_UNIVERSALSTRING		28	/**/
-#define V_ASN1_BMPSTRING		30
-#define B_ASN1_PRINTABLESTRING	0x0002
-#define B_ASN1_T61STRING	0x0004
-#define B_ASN1_IA5STRING	0x0010
-#define B_ASN1_UNIVERSALSTRING	0x0100
-#define B_ASN1_BMPSTRING	0x0800
-#define MBSTRING_FLAG		0x1000
-#define MBSTRING_UTF8		(MBSTRING_FLAG)
-#define MBSTRING_ASC		(MBSTRING_FLAG|1)
-#define MBSTRING_BMP		(MBSTRING_FLAG|2)
-#define MBSTRING_UNIV		(MBSTRING_FLAG|4)
-#define ASN1_OBJECT_FLAG_DYNAMIC	 0x01	/* internal use */
-#define ASN1_OBJECT_FLAG_DYNAMIC_STRINGS 0x04	/* internal use */
-#define ASN1_OBJECT_FLAG_DYNAMIC_DATA 	 0x08	/* internal use */
-#define ASN1_STRING_FLAG_NDEF 0x010 
-#define STABLE_NO_MASK		0x02
-#define ASN1_F_A2D_ASN1_OBJECT				 100
-#define ASN1_F_ASN1_GENERATE_V3				 178
-#define ASN1_F_ASN1_GET_OBJECT				 114
-#define ASN1_F_ASN1_MBSTRING_NCOPY			 122
-#define ASN1_F_ASN1_OBJECT_NEW				 123
-#define ASN1_F_ASN1_STR2TYPE				 179
-#define ASN1_F_ASN1_STRING_SET				 186
-#define ASN1_F_ASN1_STRING_TYPE_NEW			 130
-#define ASN1_F_BN_TO_ASN1_INTEGER			 139
-#define ASN1_F_C2I_ASN1_OBJECT				 196
-#define ASN1_F_D2I_ASN1_OBJECT				 147
-#define ASN1_R_BUFFER_TOO_SMALL				 107
-#define ASN1_R_FIRST_NUM_TOO_LARGE			 122
-#define ASN1_R_HEADER_TOO_LONG				 123
-#define ASN1_R_ILLEGAL_BITSTRING_FORMAT			 175
-#define ASN1_R_ILLEGAL_BOOLEAN				 176
-#define ASN1_R_ILLEGAL_CHARACTERS			 124
-#define ASN1_R_ILLEGAL_FORMAT				 177
-#define ASN1_R_ILLEGAL_HEX				 178
-#define ASN1_R_ILLEGAL_INTEGER				 180
-#define ASN1_R_ILLEGAL_NULL_VALUE			 182
-#define ASN1_R_ILLEGAL_OBJECT				 183
-#define ASN1_R_ILLEGAL_TIME_VALUE			 184
-#define ASN1_R_INTEGER_NOT_ASCII_FORMAT			 185
-#define ASN1_R_INVALID_BMPSTRING_LENGTH			 129
-#define ASN1_R_INVALID_DIGIT				 130
-#define ASN1_R_INVALID_OBJECT_ENCODING			 216
-#define ASN1_R_INVALID_SEPARATOR			 131
-#define ASN1_R_INVALID_UNIVERSALSTRING_LENGTH		 133
-#define ASN1_R_INVALID_UTF8STRING			 134
-#define ASN1_R_LIST_ERROR				 188
-#define ASN1_R_MISSING_SECOND_NUMBER			 138
-#define ASN1_R_NOT_ASCII_FORMAT				 190
-#define ASN1_R_OBJECT_NOT_ASCII_FORMAT			 191
-#define ASN1_R_SECOND_NUMBER_TOO_LARGE			 147
-#define ASN1_R_SEQUENCE_OR_SET_NEEDS_CONFIG		 192
-#define ASN1_R_STRING_TOO_LONG				 151
-#define ASN1_R_STRING_TOO_SHORT				 152
-#define ASN1_R_TIME_NOT_ASCII_FORMAT			 193
-#define ASN1_R_TOO_LONG					 155
-#define ASN1_R_UNKNOWN_FORMAT				 160
-#define ASN1_R_UNSUPPORTED_TYPE				 196
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #ifndef HEADER_ASN1_H
-#define V_ASN1_UNIVERSAL		0x00
-#define V_ASN1_PRIVATE			0xc0
-#define V_ASN1_CONSTRUCTED		0x20
-#define V_ASN1_PRIMITIVE_TAG		0x1f
-#define V_ASN1_NEG			0x100	/* negative flag */
-#define V_ASN1_BOOLEAN			1	/**/
-#define V_ASN1_INTEGER			2
-#define V_ASN1_NEG_INTEGER		(2 | V_ASN1_NEG)
-#define V_ASN1_BIT_STRING		3
-#define V_ASN1_OCTET_STRING		4
-#define V_ASN1_NULL			5
-#define V_ASN1_OBJECT			6
-#define V_ASN1_ENUMERATED		10
-#define V_ASN1_UTF8STRING		12
-#define V_ASN1_SEQUENCE			16
-#define V_ASN1_SET			17
-#define V_ASN1_NUMERICSTRING		18	/**/
-#define V_ASN1_PRINTABLESTRING		19
-#define V_ASN1_T61STRING		20
-#define V_ASN1_IA5STRING		22
-#define V_ASN1_UTCTIME			23
-#define V_ASN1_GENERALIZEDTIME		24	/**/
-#define V_ASN1_VISIBLESTRING		26	/* alias */
-#define V_ASN1_GENERALSTRING		27	/**/
-#define V_ASN1_UNIVERSALSTRING		28	/**/
-#define V_ASN1_BMPSTRING		30
-#define B_ASN1_PRINTABLESTRING	0x0002
-#define B_ASN1_T61STRING	0x0004
-#define B_ASN1_IA5STRING	0x0010
-#define B_ASN1_UNIVERSALSTRING	0x0100
-#define B_ASN1_BMPSTRING	0x0800
-#define MBSTRING_FLAG		0x1000
-#define MBSTRING_UTF8		(MBSTRING_FLAG)
-#define MBSTRING_ASC		(MBSTRING_FLAG|1)
-#define MBSTRING_BMP		(MBSTRING_FLAG|2)
-#define MBSTRING_UNIV		(MBSTRING_FLAG|4)
-#define ASN1_OBJECT_FLAG_DYNAMIC	 0x01	/* internal use */
-#define ASN1_OBJECT_FLAG_DYNAMIC_STRINGS 0x04	/* internal use */
-#define ASN1_OBJECT_FLAG_DYNAMIC_DATA 	 0x08	/* internal use */
-typedef struct asn1_object_st
-	{
-	const char *sn,*ln;
-	int nid;
-	int length;
-	const unsigned char *data;	/* data remains const after init */
-	int flags;	/* Should we free this one */
-	} ASN1_OBJECT;
-#define ASN1_STRING_FLAG_NDEF 0x010 
-struct asn1_string_st
-	{
-	int length;
-	int type;
-	unsigned char *data;
-	/* The value of the following field depends on the type being
-	 * held.  It is mostly being used for BIT_STRING so if the
-	 * input data has a non-zero 'unused bits' value, it will be
-	 * handled correctly */
-	long flags;
-	};
-#define STABLE_NO_MASK		0x02
-typedef struct asn1_string_table_st {
-	int nid;
-	long minsize;
-	long maxsize;
-	unsigned long mask;
-	unsigned long flags;
-} ASN1_STRING_TABLE;
-typedef struct asn1_type_st
-	{
-	int type;
-	union	{
-		char *ptr;
-		ASN1_BOOLEAN		boolean;
-		ASN1_STRING *		asn1_string;
-		ASN1_OBJECT *		object;
-		ASN1_INTEGER *		integer;
-		ASN1_ENUMERATED *	enumerated;
-		ASN1_BIT_STRING *	bit_string;
-		ASN1_OCTET_STRING *	octet_string;
-		ASN1_PRINTABLESTRING *	printablestring;
-		ASN1_T61STRING *	t61string;
-		ASN1_IA5STRING *	ia5string;
-		ASN1_GENERALSTRING *	generalstring;
-		ASN1_BMPSTRING *	bmpstring;
-		ASN1_UNIVERSALSTRING *	universalstring;
-		ASN1_UTCTIME *		utctime;
-		ASN1_GENERALIZEDTIME *	generalizedtime;
-		ASN1_VISIBLESTRING *	visiblestring;
-		ASN1_UTF8STRING *	utf8string;
-		/* set and sequence are left complete and still
-		 * contain the set or sequence bytes */
-		ASN1_STRING *		set;
-		ASN1_STRING *		sequence;
-		ASN1_VALUE *		asn1_value;
-		} value;
-	} ASN1_TYPE;
+
+
 ASN1_OBJECT *	ASN1_OBJECT_new(void );
 ASN1_OBJECT *	c2i_ASN1_OBJECT(ASN1_OBJECT **a,const unsigned char **pp,
 			long length);
@@ -3636,35 +3624,7 @@ ASN1_STRING *	ASN1_STRING_type_new(int type );
 #endif /* defined OPENSSL_SYS_VMS */
 #endif /* ! defined HEADER_VMS_IDHACKS_H */
 
-#ifndef HEADER_OPENSSL_TYPES_H
-#ifdef NO_ASN1_TYPEDEFS
-#define ASN1_INTEGER		ASN1_STRING
-#define ASN1_OCTET_STRING	ASN1_STRING
-#define ASN1_IA5STRING		ASN1_STRING
-#define ASN1_UTCTIME		ASN1_STRING
-#define ASN1_GENERALIZEDTIME	ASN1_STRING
-#define ASN1_TIME		ASN1_STRING
-#else
-typedef struct asn1_string_st ASN1_INTEGER;
-typedef struct asn1_string_st ASN1_OCTET_STRING;
-typedef struct asn1_string_st ASN1_IA5STRING;
-typedef struct asn1_string_st ASN1_UTCTIME;
-typedef struct asn1_string_st ASN1_TIME;
-typedef struct asn1_string_st ASN1_GENERALIZEDTIME;
-typedef struct asn1_string_st ASN1_STRING;
-#endif
-typedef struct bignum_st BIGNUM;
-typedef struct bignum_ctx BN_CTX;
-typedef struct bn_mont_ctx_st BN_MONT_CTX;
-typedef struct evp_pkey_asn1_method_st EVP_PKEY_ASN1_METHOD;
-typedef struct evp_pkey_method_st EVP_PKEY_METHOD;
-typedef struct dh_st DH;
-typedef struct rand_meth_st RAND_METHOD;
-typedef struct ecdh_method ECDH_METHOD;
-typedef struct X509_name_st X509_NAME;
-typedef struct v3_ext_ctx X509V3_CTX;
-typedef struct engine_st ENGINE;
-#endif /* def HEADER_OPENSSL_TYPES_H */
+
 
 #ifndef HEADER_EBCDIC_H
 #define os_toascii   _openssl_os_toascii
