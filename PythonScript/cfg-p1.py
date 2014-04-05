@@ -961,11 +961,15 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                             fDeclaration.append("/* file: "+funcName+" : "+str(root) + str(filename)+" */\n")
                                             for i in range( len(preProcessorQ) ):
                                                 fDeclaration.append(preProcessorQ.popleft())
+
+                                            cStart = 0
+                                            cEnd = 0
                                                 
                                             for i in range( len(qTemp) ):
                                                 ln = qTemp.popleft()
                                                 i = 0
-                                                if ( ln.count('(') and sCount > 0 and ( cStart == cEnd ) and (not ln.startswith("//") ) and ( not ln.startswith("#") ) ):
+                                                if ( ln.count('(') and ( cStart == cEnd ) and (not ln.startswith("//") ) and ( not ln.startswith("#") ) ):
+                                                    #print ln,
                                                     regex = re.compile(r'[\n\r\t]')
                                                     ln = regex.sub(' ', str(ln))
                                                     cleaned = clearComments(ln, True)
@@ -1255,7 +1259,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                         funcNameCln = cleanFunctionName(fListItem) 
                         if ( ( not funcNameCln in reserveWords ) and len(funcNameCln) > 0 ):                        
                             if not ( ( funcNameCln in ntFoundFunc) or ( funcNameCln in funcMap ) or ( funcNameCln in fListCln ) ):
-                                #print "Adding Function "+funcNameCln
+                                print "Adding Function "+funcNameCln
                                 fListCln.append(funcNameCln)
 
                     ''' Begins the recursive search for confirmed function calls '''
@@ -1269,7 +1273,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                     return
 
     if ( not found ):
-        print "Function Body is not found - "+ funcName
+        #print "Function Body is not found - "+ funcName
         ntFoundFunc.add(funcName)
     else:
         fDefinition.append("\n")
@@ -1287,14 +1291,7 @@ def main(argv) :
     functionName = "ecdh_low"
 
     recFuncSearch(path, functionName,".")
- #   gVariable.append("EC_KEY_new_by_curve_name")
- #   gVariable.append("EVP_PKEY")
     varSearch(path)
-
-##    print str(gVariable)
-##    print str(cDefinition)
-##
-##    print len(fDeclaration)
 
     ''' Writing all the header declarations '''
     if ( len(dDefinition) or len(fDeclaration)  ):
