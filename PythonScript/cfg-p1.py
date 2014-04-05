@@ -12,6 +12,8 @@ from copy import deepcopy
 funcMap = set()
 ''' Map of unsuccessfully found functions '''
 ntFoundFunc = set()
+''' Queue of traced preprocessor definitions '''
+fDefPre = deque()
 ''' Queue of traced function headers '''
 fDeclaration = deque()
 ''' Queue of traced function definitions '''
@@ -26,7 +28,7 @@ dDefinition = deque()
 dFound = deque()
 ''' Queue of new data definitions '''
 newDef = deque()
-''' Queue of new data definitions '''
+''' Queue of function defs in structs '''
 inStructFunc = deque()
 
 fList = []
@@ -135,7 +137,8 @@ def extractVariables(code, fList, cond ):
     templates = [ "\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*\[(.*)\][=;\s]", \
                           "^\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*;.*$", \
                           "\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*=(.*[^;]);?", \
-                          "\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*;"]
+                          "\s*\{?\s*([A-Za-z0-9_]+)([A-Za-z0-9_\*\s]*)\s+\**\s*([A-Za-z0-9_]+)\s*;",\
+                          "\s*\{?\s*STACK_OF\(([A-Za-z0-9_]*)\)\s+\**\s*([A-Za-z0-9_]+)\s*;"]
     drefPatterns = ["[^A-Za-z0-9_]+([A-Za-z0-9_]+)->([A-Za-z0-9_]+)", "[^A-Za-z0-9_]+([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)"]
     preDef = False
                           
@@ -187,7 +190,10 @@ def extractVariables(code, fList, cond ):
                                 tempTypes.append(item)
                         else:
                             if ( not re.findall("^\s*\**\s*(.*)", item)[0] in tempLVariables ):
-                                tempLVariables.append(re.findall("^\s*\**\s*(.*)", item)[0])
+                                name = re.findall("^\s*\**\s*(.*)", item)[0]
+                                if ( name.count("[") ):
+                                    name  = name.split("[",2)[0]
+                                tempLVariables.append(name)
                     i += 1
         else:
 ##            ''' case: type var[]; '''
@@ -226,7 +232,10 @@ def extractVariables(code, fList, cond ):
                                         subType = re.findall("\**\s*([A-Za-z0-9_]+)\s*\**", subType)[0]
                                         subType = clean(subType)
                                     if ( subType and not ( subType in tempLVariables or subType in fList or subType in reserveWords or subType in tempVariables) ):
-                                        tempTypes.append(subType)
+                                        if ( "STACK_OF" in orgLine ):
+                                            tempLVariables.append(subType)
+                                        else:
+                                            tempTypes.append(subType)
                                     
                             elif ( i == 2 ):
                                 tempLVariables.append(item.strip())
@@ -372,7 +381,7 @@ def varSearch(rootPath):
                             if ( cStart != cEnd ):
                                 if ( cStart < cEnd ):
                                     cStart = cEnd
-                                elif ( orgLine.count("\*") and re.findall("^([\S\s]+)/\*.*$", orgLine) ):
+                                elif ( orgLine.count("/*") and re.findall("^([\S\s]+)/\*.*$", orgLine) ):
                                     orgLine = re.findall("^([\S\s]+)/\*.*$", orgLine)[0]
                                     finishComment = True
                                 elif ( orgLine.count("*/") and re.findall("^.*/\*([\S\s]+)$", orgLine) ):
@@ -403,6 +412,10 @@ def varSearch(rootPath):
 
                             ''' Keeping track of preprocessor directives '''    
                             if ( re.findall('^\s*#\s*if.*$', orgLine ) ):
+
+                                if ( re.findall("_H\s*$", orgLine) ):
+                                    continue
+                                
                                 preProcessorQ.append(orgLine)
                                 mcrCount += 1
                                 continue
@@ -505,10 +518,10 @@ def varSearch(rootPath):
                                         if ( mcrCount ):
                                             preProcessorQ.append(orgLine)
                                         else:
-                                            tempCode.append(orgLine)
+                                            fDefPre.append(orgLine)
                                     
                                     if ( not mcrCount ):
-                                        dDefinition.append( tempCode )
+                                        fDefPre.append( "\n" )
     
                                     extractVariables(varTemp, [], False)
                                     fileContent.append(name)
@@ -655,6 +668,7 @@ def varSearch(rootPath):
                                             preProcessorQ.append(line)
                                             lineCount += 1
                                         else:
+ #                                           qTemp.append("/* file: "+name+" : "+str(root) + str(filename)+" */\n")
                                             qTemp.append(line)
 
                                     if ( ( cmtS == cmtE and not stripped(line).startswith("//") ) or ( not stripped(line).startswith("/*") and not line.count("*/") and line.count("/*") )):
@@ -698,6 +712,7 @@ def varSearch(rootPath):
                                         continue
                                     
                                 if ( not mcrCount ):
+                                    qTemp.append("\n")
                                     dDefinition.append(qTemp)
 
 ##                                print "qtemp "+str(qTemp)+" "+str(mcrCount)
@@ -863,9 +878,9 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                         fDeclaration.append("/* file: "+funcName+" : "+str(root) + str(filename)+" */\n")
                                         
                                         for i in range( len(preProcessorQ) ):
-                                            fDeclaration.append(preProcessorQ.popleft())
+                                            fDefPre.append(preProcessorQ.popleft())
                                                
-                                        fDeclaration.append(orgLine)
+                                        fDefPre.append(orgLine)
                                         tempCode.append(orgLine)
                                         #print orgLine,
 
@@ -897,8 +912,9 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                             cStart += line.count('/*')
                                             cEnd += line.count('*/')
                                             #print orgLine,
-                                            fDeclaration.append(orgLine)
+                                            fDefPre.append(orgLine)
                                             tempCode.append(orgLine)
+                                        fDefPre.append("\n")
                                     else:
                                         funcDefn = False
                                         qTemp = deque()
@@ -985,6 +1001,9 @@ def recFuncSearch(rootPath, funcName, rootFile):
                             ''' Keeping track of preprocessor directives '''    
                             match = re.findall('^#\s*if.*', line )
                             if ( match ):
+                                if ( re.findall("_H\s*$", line ) ):
+                                    continue
+                                
                                 if ( found ):
                                     preProcessorQIgn += 1
                                 else :
@@ -1200,6 +1219,9 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                     ''' To remove unwanted preprocessor directives '''
                                     match = re.findall('^#\s*end.*', stripped(line))
                                     if ( match ):
+                                        if ( re.findall("_H\s*$", line) ):
+                                            continue
+                                
                                         gSkip = True
                                         if ( preProcessorQIgn > 0 ):
                                             preProcessorQIgn -= 1
@@ -1262,7 +1284,7 @@ def main(argv) :
     ''' Has to be the root path of the code base '''
     path = "/Volumes/work/Phd/ECDH/kv_openssl/"
     ''' Name of the looked function '''
-    functionName = "STORE_HANDLE_OBJECT_FUNC_PTR"
+    functionName = "ecdh_low"
 
     recFuncSearch(path, functionName,".")
  #   gVariable.append("EC_KEY_new_by_curve_name")
