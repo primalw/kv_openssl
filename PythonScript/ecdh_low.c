@@ -9768,3 +9768,910 @@ const EC_POINT *EC_KEY_get0_public_key(const EC_KEY *key)
 	{
 	return key->pub_key;
 	}
+	
+/* file: s2i_ASN1_INTEGER : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3v3_utl.c */
+ASN1_INTEGER *s2i_ASN1_INTEGER(X509V3_EXT_METHOD *method, char *value) {
+	BIGNUM *bn = NULL;
+	ASN1_INTEGER *aint;
+	int isneg, ishex;
+	int ret;
+	if (!value) {   X509V3err(X509V3_F_S2I_ASN1_INTEGER,X509V3_R_INVALID_NULL_VALUE); 		return 0;
+	}
+	bn = BN_new();  if (value[0] == '-') { 		value++;
+		isneg = 1;
+	} else isneg = 0;
+	
+	if (value[0] == '0' && ((value[1] == 'x') || (value[1] == 'X'))) { 		value += 2;
+		ishex = 1;
+	} else ishex = 0;
+	
+	if (ishex) ret = BN_hex2bn(&bn, value);  else ret = BN_dec2bn(&bn, value); 
+	if (!ret || value[ret]) {   BN_free(bn);   X509V3err(X509V3_F_S2I_ASN1_INTEGER,X509V3_R_BN_DEC2BN_ERROR); 		return 0;
+	}
+	
+	if (isneg && BN_is_zero(bn)) isneg = 0; 
+	aint = BN_to_ASN1_INTEGER(bn, NULL);  BN_free(bn);  if (!aint) {   X509V3err(X509V3_F_S2I_ASN1_INTEGER,X509V3_R_BN_TO_ASN1_INTEGER_ERROR); 		return 0;
+	}
+	if (isneg) aint->type |= V_ASN1_NEG; 	return aint;
+}
+
+/* file: ASN1_STRING_type_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1_lib.c */
+ASN1_STRING *ASN1_STRING_type_new(int type) 	{
+	ASN1_STRING *ret;
+	
+	ret=(ASN1_STRING *)OPENSSL_malloc(sizeof(ASN1_STRING));  if (ret == NULL) 		{
+		ASN1err(ASN1_F_ASN1_STRING_TYPE_NEW,ERR_R_MALLOC_FAILURE);   return(NULL); 		}
+	ret->length=0;
+	ret->type=type;
+	ret->data=NULL;
+	ret->flags=0;
+	return(ret); 	}
+	
+/* file: OBJ_bsearch_ex_ : /Volumes/work/Phd/ECDH/kv_openssl/crypto/objectsobj_dat.c */
+const void *OBJ_bsearch_ex_(const void *key, const void *base_, int num, 			    int size,
+							int (*cmp)(const void *, const void *), 			    int flags)
+{
+	const char *base=base_;
+	int l,h,i=0,c=0;
+	const char *p = NULL;
+	
+	if (num == 0) return(NULL); 	l=0;
+	h=num;
+	while (l < h) 		{
+		i=(l+h)/2;   p= &(base[i*size]);   c=(*cmp)(key,p);   if (c < 0) 			h=i;
+		else if (c > 0) 			l=i+1;
+		else
+			break;
+	}
+#ifdef CHARSET_EBCDIC
+	/* THIS IS A KLUDGE - Because the *_obj is sorted in ASCII order, and
+	 * I don't have perl (yet), we revert to a *LINEAR* search
+	 * when the object wasn't found in the binary search.
+	 */
+	if (c != 0) 		{
+		for (i=0; i<num; ++i) 			{
+			p= &(base[i*size]);    c = (*cmp)(key,p);    if (c == 0 || (c < 0 && (flags & OBJ_BSEARCH_VALUE_ON_NOMATCH))) 				return p;
+		}
+	}
+#endif
+	if (c != 0 && !(flags & OBJ_BSEARCH_VALUE_ON_NOMATCH)) 		p = NULL;
+	else if (c == 0 && (flags & OBJ_BSEARCH_FIRST_VALUE_ON_MATCH)) 		{
+		while(i > 0 && (*cmp)(key,&(base[(i-1)*size])) == 0) 			i--;
+		p = &(base[i*size]); 		}
+	return(p); 	}
+
+/* file: OBJ_dup : /Volumes/work/Phd/ECDH/kv_openssl/crypto/objectsobj_lib.c */
+ASN1_OBJECT *OBJ_dup(const ASN1_OBJECT *o) 	{
+	ASN1_OBJECT *r;
+	int i;
+	char *ln=NULL,*sn=NULL;
+	unsigned char *data=NULL;
+	
+	if (o == NULL) return(NULL);  if (!(o->flags & ASN1_OBJECT_FLAG_DYNAMIC))   return((ASN1_OBJECT *)o); /* XXX: ugh! Why? What kind of 					     duplication is this??? */
+	
+	r=ASN1_OBJECT_new();  if (r == NULL) 		{
+		OBJerr(OBJ_F_OBJ_DUP,ERR_R_ASN1_LIB);   return(NULL); 		}
+	data=OPENSSL_malloc(o->length);  if (data == NULL) 		goto err;
+	if (o->data != NULL)   memcpy(data,o->data,o->length); 	/* once data attached to object it remains const */
+	r->data = data;
+	r->length=o->length;
+	r->nid=o->nid;
+	r->ln=r->sn=NULL;
+	if (o->ln != NULL) 		{
+		i=strlen(o->ln)+1;   ln=OPENSSL_malloc(i);   if (ln == NULL) goto err;   memcpy(ln,o->ln,i); 		r->ln=ln;
+	}
+	
+	if (o->sn != NULL) 		{
+		i=strlen(o->sn)+1;   sn=OPENSSL_malloc(i);   if (sn == NULL) goto err;   memcpy(sn,o->sn,i); 		r->sn=sn;
+	}
+	r->flags=o->flags|(ASN1_OBJECT_FLAG_DYNAMIC| 		ASN1_OBJECT_FLAG_DYNAMIC_STRINGS|ASN1_OBJECT_FLAG_DYNAMIC_DATA);
+	return(r); err:
+	OBJerr(OBJ_F_OBJ_DUP,ERR_R_MALLOC_FAILURE);  if (ln != NULL)  OPENSSL_free(ln);  if (sn != NULL)  OPENSSL_free(sn);  if (data != NULL) OPENSSL_free(data);  if (r != NULL)  OPENSSL_free(r);  return(NULL); 	}
+
+/* file: internal_find : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stackstack.c */
+static int internal_find(_STACK *st, void *data, int ret_val_options) 	{
+	const void * const *r;
+	int i;
+	
+	if(st == NULL) return -1; 
+	if (st->comp == NULL) 		{
+		for (i=0; i<st->num; i++)    if (st->data[i] == data)     return(i);   return(-1); 		}
+	sk_sort(st);  if (data == NULL) return(-1);  r=OBJ_bsearch_ex_(&data,st->data,st->num,sizeof(void *),st->comp, 			  ret_val_options);
+	if (r == NULL) return(-1);  return (int)((char **)r-st->data); 	}
+	
+/* file: BUF_strdup : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bufferbuf_str.c */
+char *BUF_strdup(const char *str) 	{
+	if (str == NULL) return(NULL);  return BUF_strndup(str, strlen(str)); 	}
+/* file: BUF_strndup : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bufferbuf_str.c */
+char *BUF_strndup(const char *str, size_t siz) 	{
+	char *ret;
+	
+	if (str == NULL) return(NULL); 
+	ret=OPENSSL_malloc(siz+1);  if (ret == NULL)  		{
+		BUFerr(BUF_F_BUF_STRNDUP,ERR_R_MALLOC_FAILURE);   return(NULL); 		}
+	BUF_strlcpy(ret,str,siz+1);  return(ret); 	}
+	
+/* file: c2i_ASN1_OBJECT : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_object.c */
+ASN1_OBJECT *c2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp, 	     long len)
+{
+	ASN1_OBJECT *ret=NULL;
+	const unsigned char *p;
+	unsigned char *data;
+	int i;
+	/* Sanity check OID encoding: can't have leading 0x80 in
+	 * subidentifiers, see: X.690 8.19.2
+	 */
+	for (i = 0, p = *pp; i < len; i++, p++) 		{
+		if (*p == 0x80 && (!i || !(p[-1] & 0x80))) 			{
+			ASN1err(ASN1_F_C2I_ASN1_OBJECT,ASN1_R_INVALID_OBJECT_ENCODING); 			return NULL;
+		}
+	}
+	
+	/* only the ASN1_OBJECTs from the 'table' will have values
+	 * for ->sn or ->ln */
+	if ((a == NULL) || ((*a) == NULL) ||   !((*a)->flags & ASN1_OBJECT_FLAG_DYNAMIC)) 		{
+		if ((ret=ASN1_OBJECT_new()) == NULL) return(NULL); 		}
+	else ret=(*a); 
+	p= *pp;
+	/* detach data from object */
+	data = (unsigned char *)ret->data; 	ret->data = NULL;
+	/* once detached we can change it */
+	if ((data == NULL) || (ret->length < len)) 		{
+		ret->length=0;
+		if (data != NULL) OPENSSL_free(data);   data=(unsigned char *)OPENSSL_malloc(len ? (int)len : 1);   if (data == NULL) 			{ i=ERR_R_MALLOC_FAILURE; goto err; }
+		ret->flags|=ASN1_OBJECT_FLAG_DYNAMIC_DATA;
+	}
+	memcpy(data,p,(int)len); 	/* reattach data to object, after which it remains const */
+	ret->data  =data;
+	ret->length=(int)len; 	ret->sn=NULL;
+	ret->ln=NULL;
+	/* ret->flags=ASN1_OBJECT_FLAG_DYNAMIC; we know it is dynamic */
+	p+=len;
+	
+	if (a != NULL) (*a)=ret; 	*pp=p;
+	return(ret); err:
+	ASN1err(ASN1_F_C2I_ASN1_OBJECT,i);  if ((ret != NULL) && ((a == NULL) || (*a != ret)))   ASN1_OBJECT_free(ret);  return(NULL); 	}
+
+/* file: ASN1_OBJECT_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_object.c */
+ASN1_OBJECT *ASN1_OBJECT_new(void) 	{
+	ASN1_OBJECT *ret;
+	
+	ret=(ASN1_OBJECT *)OPENSSL_malloc(sizeof(ASN1_OBJECT));  if (ret == NULL) 		{
+		ASN1err(ASN1_F_ASN1_OBJECT_NEW,ERR_R_MALLOC_FAILURE);   return(NULL); 		}
+	ret->length=0;
+	ret->data=NULL;
+	ret->nid=0;
+	ret->sn=NULL;
+	ret->ln=NULL;
+	ret->flags=ASN1_OBJECT_FLAG_DYNAMIC;
+	return(ret); 	}
+
+
+/* file: d2i_ASN1_OBJECT : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_object.c */
+ASN1_OBJECT *d2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp, 	     long length)
+{
+	const unsigned char *p;
+	long len;
+	int tag,xclass;
+	int inf,i;
+	ASN1_OBJECT *ret = NULL;
+	p= *pp;
+	inf=ASN1_get_object(&p,&len,&tag,&xclass,length);  if (inf & 0x80) 		{
+		i=ASN1_R_BAD_OBJECT_HEADER;
+		goto err;
+	}
+	
+	if (tag != V_ASN1_OBJECT) 		{
+		i=ASN1_R_EXPECTING_AN_OBJECT;
+		goto err;
+	}
+	ret = c2i_ASN1_OBJECT(a, &p, len);  if(ret) *pp = p; 	return ret;
+err:
+	ASN1err(ASN1_F_D2I_ASN1_OBJECT,i);  return(NULL); }
+
+
+/* FIXME : correct function body */	
+/* file: bn_expand_internal : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_lib.c */
+static BN_ULONG *bn_expand_internal(const BIGNUM *b, int words) 	{
+	BN_ULONG *A,*a = NULL;
+	const BN_ULONG *B;
+	int i;
+	
+	bn_check_top(b); 
+	if (words > (INT_MAX/(4*BN_BITS2))) 		{
+		BNerr(BN_F_BN_EXPAND_INTERNAL,BN_R_BIGNUM_TOO_LONG); 		return NULL;
+	}
+	if (BN_get_flags(b,BN_FLG_STATIC_DATA)) 		{
+		BNerr(BN_F_BN_EXPAND_INTERNAL,BN_R_EXPAND_ON_STATIC_BIGNUM_DATA);   return(NULL); 		}
+	a=A=(BN_ULONG *)OPENSSL_malloc(sizeof(BN_ULONG)*words);  if (A == NULL) 		{
+		BNerr(BN_F_BN_EXPAND_INTERNAL,ERR_R_MALLOC_FAILURE);   return(NULL); 		}
+#if 1
+	B=b->d;
+	/* Check if the previous number needs to be copied */
+	if (B != NULL) 		{
+		for (i=b->top>>2; i>0; i--,A+=4,B+=4) 			{
+			/*
+			 * The fact that the loop is unrolled
+			 * 4-wise is a tribute to Intel. It's
+			 * the one that doesn't have enough
+			 * registers to accomodate more data.
+			 * I'd unroll it 8-wise otherwise:-)
+			 *
+			 *		<appro@fy.chalmers.se>
+			 */
+			BN_ULONG a0,a1,a2,a3;
+			a0=B[0]; a1=B[1]; a2=B[2]; a3=B[3];
+			A[0]=a0; A[1]=a1; A[2]=a2; A[3]=a3;
+		}
+		switch (b->top&3) 			{
+			case 3:	A[2]=B[2];
+			case 2:	A[1]=B[1];
+			case 1:	A[0]=B[0];
+			case 0: /* workaround for ultrix cc: without 'case 0', the optimizer does
+					 * the switch table by doing a=top&3; a--; goto jump_table[a];
+					 * which fails for top== 0 */
+				;
+		}
+	}
+	
+#else
+	memset(A,0,sizeof(BN_ULONG)*words); 
+}
+
+/* file: OBJ_nid2obj : /Volumes/work/Phd/ECDH/kv_openssl/crypto/objectsobj_dat.c */
+ASN1_OBJECT *OBJ_nid2obj(int n) 	{
+	ADDED_OBJ ad,*adp;
+	ASN1_OBJECT ob;
+	
+	if ((n >= 0) && (n < NUM_NID)) 		{
+		if ((n != NID_undef) && (nid_objs[n].nid == NID_undef)) 			{
+			OBJerr(OBJ_F_OBJ_NID2OBJ,OBJ_R_UNKNOWN_NID);    return(NULL); 			}
+		return((ASN1_OBJECT *)&(nid_objs[n])); 		}
+	else if (added == NULL)   return(NULL); 	else
+	{
+		ad.type=ADDED_NID;
+		ad.obj= &ob;
+		ob.nid=n;
+		adp=lh_ADDED_OBJ_retrieve(added,&ad);   if (adp != NULL)    return(adp->obj); 		else
+		{
+			OBJerr(OBJ_F_OBJ_NID2OBJ,OBJ_R_UNKNOWN_NID);    return(NULL); 			}
+	}
+}
+
+
+/* file: OBJ_txt2obj : /Volumes/work/Phd/ECDH/kv_openssl/crypto/objectsobj_dat.c */
+ASN1_OBJECT *OBJ_txt2obj(const char *s, int no_name) 	{
+	int nid = NID_undef;
+	ASN1_OBJECT *op=NULL;
+	unsigned char *buf;
+	unsigned char *p;
+	const unsigned char *cp;
+	int i, j;
+	
+	if(!no_name) {   if( ((nid = OBJ_sn2nid(s)) != NID_undef) ||    ((nid = OBJ_ln2nid(s)) != NID_undef) )       return OBJ_nid2obj(nid); 	}
+	
+	/* Work out size of content octets */
+	i=a2d_ASN1_OBJECT(NULL,0,s,-1);  if (i <= 0) { 		/* Don't clear the error */
+		/*ERR_clear_error();*/ 		return NULL;
+	}
+	/* Work out total size */
+	j = ASN1_object_size(0,i,V_ASN1_OBJECT); 
+	if((buf=(unsigned char *)OPENSSL_malloc(j)) == NULL) return NULL; 
+	p = buf;
+	/* Write out tag+length */
+	ASN1_put_object(&p,0,i,V_ASN1_OBJECT,V_ASN1_UNIVERSAL); 	/* Write out contents */
+	a2d_ASN1_OBJECT(p,i,s,-1); 
+	cp=buf;
+	op=d2i_ASN1_OBJECT(NULL,&cp,j);  OPENSSL_free(buf); 	return op;
+}
+
+/* file: _strlen31 : /Volumes/work/Phd/ECDH/kv_openssl/e_os.h */
+#if (defined(WINDOWS) || defined(MSDOS))
+#  ifdef WINDOWS
+#    ifdef _WIN64
+static unsigned int _strlen31(const char *str) 	{
+	unsigned int len=0;
+	while (*str && len<0x80000000U) str++, len++; 	return len&0x7FFFFFFF;
+}
+#    endif
+#  endif
+#else /* The non-microsoft world */
+#  endif
+
+/* file: ecdh_low : /Volumes/work/Phd/ECDH/kv_openssl/PythonScriptecdh_low.h */
+unsigned char *ecdh_low(size_t *secret_len) { 	EC_KEY *key, *peerkey;
+	int field_size;
+	unsigned char *secret;
+	
+	/* Create an Elliptic Curve Key object and set it up to use the ANSI X9.62 Prime 256v1 curve */
+	if(NULL == (key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1))) handleErrors();   	/* Generate the private and public key */
+	if(1 != EC_KEY_generate_key(key)) handleErrors();   	/* Get the peer's public key, and provide the peer with our public key -
+															 * how this is done will be specific to your circumstances */
+	peerkey = get_peerkey_low(key);   	/* Calculate the size of the buffer for the shared secret */
+	field_size = EC_GROUP_get_degree(EC_KEY_get0_group(key));  *secret_len = (field_size+7)/8;   	/* Allocate the memory for the shared secret */
+	if(NULL == (secret = OPENSSL_malloc(*secret_len))) handleErrors();   	/* Derive the shared secret */
+	*secret_len = ECDH_compute_key(secret, *secret_len, EC_KEY_get0_public_key(peerkey),            key, NULL); 	
+	/* Clean up */
+	EC_KEY_free(key);  EC_KEY_free(peerkey);    if(*secret_len <= 0)  {   OPENSSL_free(secret);   return NULL; 	}
+	
+	return secret;
+}/* file: EC_KEY_new_by_curve_name : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+
+/* file: ec_group_new_from_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_curve.c */
+static EC_GROUP *ec_group_new_from_data(const ec_list_element curve) 	{
+	EC_GROUP *group=NULL;
+	EC_POINT *P=NULL;
+	BN_CTX	 *ctx=NULL;
+	BIGNUM	 *p=NULL, *a=NULL, *b=NULL, *x=NULL, *y=NULL, *order=NULL;
+	int	 ok=0;
+	int	 seed_len,param_len;
+	const EC_METHOD *meth;
+	const EC_CURVE_DATA *data;
+	const unsigned char *params;
+	
+	if ((ctx = BN_CTX_new()) == NULL) 		{
+		ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_MALLOC_FAILURE); 		goto err;
+	}
+	
+	data = curve.data;
+	seed_len  = data->seed_len;
+	param_len = data->param_len;
+	params   = (const unsigned char *)(data+1); /* skip header */ 	params	 += seed_len;				/* skip seed   */
+	
+	if (!(p = BN_bin2bn(params+0*param_len, param_len, NULL))   || !(a = BN_bin2bn(params+1*param_len, param_len, NULL))   || !(b = BN_bin2bn(params+2*param_len, param_len, NULL))) 		{
+		ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_BN_LIB); 		goto err;
+	}
+	
+	if (curve.meth != 0) 		{
+		meth = curve.meth();   if (((group = EC_GROUP_new(meth)) == NULL) ||    (!(group->meth->group_set_curve(group, p, a, b, ctx)))) 			{
+			ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB); 			goto err;
+		}
+	}
+	else if (data->field_type == NID_X9_62_prime_field) 		{
+		if ((group = EC_GROUP_new_curve_GFp(p, a, b, ctx)) == NULL) 			{
+			ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB); 			goto err;
+		}
+	}
+#ifndef OPENSSL_NO_EC2M
+	else	/* field_type == NID_X9_62_characteristic_two_field */
+	{
+		if ((group = EC_GROUP_new_curve_GF2m(p, a, b, ctx)) == NULL) 			{
+			ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB); 			goto err;
+		}
+	}
+#endif
+	
+	if ((P = EC_POINT_new(group)) == NULL) 		{
+		ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB); 		goto err;
+	}
+	
+	if (!(x = BN_bin2bn(params+3*param_len, param_len, NULL))   || !(y = BN_bin2bn(params+4*param_len, param_len, NULL))) 		{
+		ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_BN_LIB); 		goto err;
+	}
+	if (!EC_POINT_set_affine_coordinates_GFp(group, P, x, y, ctx)) 		{
+		ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB); 		goto err;
+	}
+	if (!(order = BN_bin2bn(params+5*param_len, param_len, NULL))   || !BN_set_word(x, (BN_ULONG)data->cofactor)) 		{
+		ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_BN_LIB); 		goto err;
+	}
+	if (!EC_GROUP_set_generator(group, P, order, x)) 		{
+		ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB); 		goto err;
+	}
+	if (seed_len) 		{
+		if (!EC_GROUP_set_seed(group, params-seed_len, seed_len)) 			{
+			ECerr(EC_F_EC_GROUP_NEW_FROM_DATA, ERR_R_EC_LIB); 			goto err;
+		}
+	}
+	ok=1;
+err:
+	if (!ok) 		{
+		EC_GROUP_free(group); 		group = NULL;
+	}
+	if (P)   EC_POINT_free(P);  if (ctx)   BN_CTX_free(ctx);  if (p)   BN_free(p);  if (a)   BN_free(a);  if (b)   BN_free(b);  if (order)   BN_free(order);  if (x)   BN_free(x);  if (y)   BN_free(y); 	return group;
+}
+
+/* file: BN_POOL_get : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
+static BIGNUM *BN_POOL_get(BN_POOL *p) 	{
+	if(p->used == p->size) 		{
+		BIGNUM *bn;
+		unsigned int loop = 0;
+		BN_POOL_ITEM *item = OPENSSL_malloc(sizeof(BN_POOL_ITEM));   if(!item) return NULL; 		/* Initialise the structure */
+		bn = item->vals;
+		while(loop++ < BN_CTX_POOL_SIZE)    BN_init(bn++); 		item->prev = p->tail;
+		item->next = NULL;
+		/* Link it in */
+		if(!p->head) 			p->head = p->current = p->tail = item;
+		else
+		{
+			p->tail->next = item;
+			p->tail = item;
+			p->current = item;
+		}
+		p->size += BN_CTX_POOL_SIZE;
+		p->used++;
+		/* Return the first bignum from the new pool */
+		return item->vals;
+	}
+	if(!p->used) 		p->current = p->head;
+	else if((p->used % BN_CTX_POOL_SIZE) == 0) 		p->current = p->current->next;
+	return p->current->vals + ((p->used++) % BN_CTX_POOL_SIZE); 	}
+	
+/* file: ctxdbg : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
+#ifdef BN_CTX_DEBUG
+static void ctxdbg(BN_CTX *ctx) 	{
+	unsigned int bnidx = 0, fpidx = 0;
+	BN_POOL_ITEM *item = ctx->pool.head;
+	BN_STACK *stack = &ctx->stack;
+	fprintf(stderr,"(%08x): ", (unsigned int)ctx);  while(bnidx < ctx->used) 		{
+		fprintf(stderr,"%03x ", item->vals[bnidx++ % BN_CTX_POOL_SIZE].dmax);   if(!(bnidx % BN_CTX_POOL_SIZE)) 			item = item->next;
+	}
+	fprintf(stderr,"\n"); 	bnidx = 0;
+	fprintf(stderr,"          : ");  while(fpidx < stack->depth) 		{
+		while(bnidx++ < stack->indexes[fpidx])    fprintf(stderr,"    ");   fprintf(stderr,"^^^ "); 		bnidx++;
+		fpidx++;
+	}
+	fprintf(stderr,"\n"); 	}
+#endif
+
+/* file: ECDH_DATA_new_method : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecdhech_lib.c */
+static ECDH_DATA *ECDH_DATA_new_method(ENGINE *engine) 	{
+	ECDH_DATA *ret;
+	
+	ret=(ECDH_DATA *)OPENSSL_malloc(sizeof(ECDH_DATA));  if (ret == NULL) 		{
+		ECDHerr(ECDH_F_ECDH_DATA_NEW_METHOD, ERR_R_MALLOC_FAILURE);   return(NULL); 		}
+	
+	ret->init = NULL;
+	
+	ret->meth = ECDH_get_default_method(); 	ret->engine = engine;
+#ifndef OPENSSL_NO_ENGINE
+	if (!ret->engine)   ret->engine = ENGINE_get_default_ECDH();  if (ret->engine) 		{
+		ret->meth = ENGINE_get_ECDH(ret->engine);   if (!ret->meth) 			{
+			ECDHerr(ECDH_F_ECDH_DATA_NEW_METHOD, ERR_R_ENGINE_LIB);    ENGINE_finish(ret->engine);    OPENSSL_free(ret); 			return NULL;
+		}
+	}
+#endif
+	
+	ret->flags = ret->meth->flags;
+	CRYPTO_new_ex_data(CRYPTO_EX_INDEX_ECDH, ret, &ret->ex_data); #if 0
+		if ((ret->meth->init != NULL) && !ret->meth->init(ret)) 		{
+			CRYPTO_free_ex_data(CRYPTO_EX_INDEX_ECDH, ret, &ret->ex_data);   OPENSSL_free(ret); 		ret=NULL;
+		}	
+	return(ret); 	}
+	
+/* file: compute_wNAF : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_mult.c */
+static signed char *compute_wNAF(const BIGNUM *scalar, int w, size_t *ret_len) 	{
+	int window_val;
+	int ok = 0;
+	signed char *r = NULL;
+	int sign = 1;
+	int bit, next_bit, mask;
+	size_t len = 0, j;
+	
+	if (BN_is_zero(scalar)) 		{
+		r = OPENSSL_malloc(1);   if (!r) 			{
+			ECerr(EC_F_COMPUTE_WNAF, ERR_R_MALLOC_FAILURE); 			goto err;
+		}
+		r[0] = 0;
+		*ret_len = 1;
+		return r;
+	}
+	
+	if (w <= 0 || w > 7) /* 'signed char' can represent integers with absolute values less than 2^7 */ 		{
+		ECerr(EC_F_COMPUTE_WNAF, ERR_R_INTERNAL_ERROR); 		goto err;
+	}
+	bit = 1 << w; /* at most 128 */
+	next_bit = bit << 1; /* at most 256 */
+	mask = next_bit - 1; /* at most 255 */
+	
+	if (BN_is_negative(scalar)) 		{
+		sign = -1;
+	}
+	
+	if (scalar->d == NULL || scalar->top == 0) 		{
+		ECerr(EC_F_COMPUTE_WNAF, ERR_R_INTERNAL_ERROR); 		goto err;
+	}
+	
+	len = BN_num_bits(scalar);  r = OPENSSL_malloc(len + 1); /* modified wNAF may be one digit longer than binary representation 	                              * (*ret_len will be set to the actual length, i.e. at most
+															  * BN_num_bits(scalar) + 1) */
+	if (r == NULL) 		{
+		ECerr(EC_F_COMPUTE_WNAF, ERR_R_MALLOC_FAILURE); 		goto err;
+	}
+	window_val = scalar->d[0] & mask;
+	j = 0;
+	while ((window_val != 0) || (j + w + 1 < len)) /* if j+w+1 >= len, window_val will not increase */ 		{
+		int digit = 0;
+		
+		/* 0 <= window_val <= 2^(w+1) */ 
+		if (window_val & 1) 			{
+			/* 0 < window_val < 2^(w+1) */ 
+			if (window_val & bit) 				{
+				digit = window_val - next_bit; /* -2^w < digit < 0 */
+				
+#if 1 /* modified wNAF */
+				if (j + w + 1 >= len) 					{
+					/* special case for generating modified wNAFs:
+					 * no new bits will be added into window_val,
+					 * so using a positive digit here will decrease
+					 * the total length of the representation */
+					
+					digit = window_val & (mask >> 1); /* 0 < digit < 2^w */ 					}
+#endif
+			}
+			else
+			{
+				digit = window_val; /* 0 < digit < 2^w */
+			}
+			
+			if (digit <= -bit || digit >= bit || !(digit & 1)) 				{
+				ECerr(EC_F_COMPUTE_WNAF, ERR_R_INTERNAL_ERROR); 				goto err;
+			}
+			
+			window_val -= digit;
+			
+			/* now window_val is 0 or 2^(w+1) in standard wNAF generation; 			 * for modified window NAFs, it may also be 2^w
+			 */
+			if (window_val != 0 && window_val != next_bit && window_val != bit) 				{
+				ECerr(EC_F_COMPUTE_WNAF, ERR_R_INTERNAL_ERROR); 				goto err;
+			}
+		}
+		
+		r[j++] = sign * digit;
+		
+		window_val >>= 1;
+		window_val += bit * BN_is_bit_set(scalar, j + w); 
+		if (window_val > next_bit) 			{
+			ECerr(EC_F_COMPUTE_WNAF, ERR_R_INTERNAL_ERROR); 			goto err;
+		}
+	}
+	
+	if (j > len + 1) 		{
+		ECerr(EC_F_COMPUTE_WNAF, ERR_R_INTERNAL_ERROR); 		goto err;
+	}
+	len = j;
+	ok = 1;
+	
+err:
+	if (!ok) 		{
+		OPENSSL_free(r); 		r = NULL;
+	}
+	if (ok) 		*ret_len = len;
+	return r;
+}
+
+/* file: bn_rand_range : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_rand.c */
+static int bn_rand_range(int pseudo, BIGNUM *r, const BIGNUM *range) 	{
+	int (*bn_rand)(BIGNUM *, int, int, int) = pseudo ? BN_pseudo_rand : BN_rand; 	int n;
+	int count = 100;
+	
+	if (range->neg || BN_is_zero(range)) 		{
+		BNerr(BN_F_BN_RAND_RANGE, BN_R_INVALID_RANGE); 		return 0;
+	}
+	
+	n = BN_num_bits(range); /* n > 0 */ 
+	/* BN_is_bit_set(range, n - 1) always holds */ 
+	if (n == 1)   BN_zero(r);  else if (!BN_is_bit_set(range, n - 2) && !BN_is_bit_set(range, n - 3)) 		{
+		/* range = 100..._2,
+		 * so  3*range (= 11..._2)  is exactly one bit longer than  range */
+		do
+		{
+			if (!bn_rand(r, n + 1, -1, 0)) return 0; 			/* If  r < 3*range,  use  r := r MOD range
+																 * (which is either  r, r - range,  or  r - 2*range).
+																 * Otherwise, iterate once more.
+																 * Since  3*range = 11..._2, each iteration succeeds with
+																 * probability >= .75. */
+			if (BN_cmp(r ,range) >= 0) 				{
+				if (!BN_sub(r, r, range)) return 0;     if (BN_cmp(r, range) >= 0)      if (!BN_sub(r, r, range)) return 0; 				}
+			
+			if (!--count) 				{
+				BNerr(BN_F_BN_RAND_RANGE, BN_R_TOO_MANY_ITERATIONS); 				return 0;
+			}
+			
+		}
+		while (BN_cmp(r, range) >= 0); 		}
+	else
+	{
+		do
+		{
+			/* range = 11..._2  or  range = 101..._2 */
+			if (!bn_rand(r, n, -1, 0)) return 0; 
+			if (!--count) 				{
+				BNerr(BN_F_BN_RAND_RANGE, BN_R_TOO_MANY_ITERATIONS); 				return 0;
+			}
+		}
+		while (BN_cmp(r, range) >= 0); 		}
+	
+	bn_check_top(r); 	return 1;
+}
+
+/* file: err_fns_check : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.c */
+static void err_fns_check(void) 	{
+	if (err_fns) return; 	
+	CRYPTO_w_lock(CRYPTO_LOCK_ERR);  if (!err_fns) 		err_fns = &err_defaults;
+	CRYPTO_w_unlock(CRYPTO_LOCK_ERR); 	}
+	
+	
+#ifndef HAVE_CRYPTODEV
+#else 
+static int
+cryptodev_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
+				 const unsigned char *in, size_t inl)
+{
+	struct crypt_op cryp;
+	struct dev_crypto_state *state = ctx->cipher_data;
+	struct session_op *sess = &state->d_sess;
+	const void *iiv;
+	unsigned char save_iv[EVP_MAX_IV_LENGTH];
+	
+	if (state->d_fd < 0)
+		return (0);
+	if (!inl)
+		return (1);
+	if ((inl % ctx->cipher->block_size) != 0)
+		return (0);
+	
+	memset(&cryp, 0, sizeof(cryp));
+	
+	cryp.ses = sess->ses;
+	cryp.flags = 0;
+	cryp.len = inl;
+	cryp.mac = 0;
+	
+	cryp.op = ctx->encrypt ? COP_ENCRYPT : COP_DECRYPT;
+	
+	if (ctx->cipher->iv_len) {
+		if (!ctx->encrypt) {
+			iiv = in + inl - ctx->cipher->iv_len;
+			memcpy(save_iv, iiv, ctx->cipher->iv_len);
+		}
+	} else
+		cryp.iv = NULL;
+	
+	if (ioctl(state->d_fd, CIOCCRYPT, &cryp) == -1) {
+		/* XXX need better errror handling
+		 * this can fail for a number of different reasons.
+		 */
+		return (0);
+	}
+	
+	if (ctx->cipher->iv_len) {
+		if (ctx->encrypt)
+			iiv = out + inl - ctx->cipher->iv_len;
+		else
+			iiv = save_iv;
+		memcpy(ctx->iv, iiv, ctx->cipher->iv_len);
+	}
+	return (1);
+}
+
+static int
+cryptodev_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
+				   const unsigned char *iv, int enc)
+{
+	struct dev_crypto_state *state = ctx->cipher_data;
+	struct session_op *sess = &state->d_sess;
+	int cipher = -1, i;
+	
+	for (i = 0; ciphers[i].id; i++)
+		if (ctx->cipher->nid == ciphers[i].nid &&
+		    ctx->cipher->iv_len <= ciphers[i].ivmax &&
+		    ctx->key_len == ciphers[i].keylen) {
+			cipher = ciphers[i].id;
+			break;
+		}
+	
+	if (!ciphers[i].id) {
+		state->d_fd = -1;
+		return (0);
+	}
+	
+	memset(sess, 0, sizeof(struct session_op));
+	
+	if ((state->d_fd = get_dev_crypto()) < 0)
+		return (0);
+	
+	sess->keylen = ctx->key_len;
+	sess->cipher = cipher;
+	
+	if (ioctl(state->d_fd, CIOCGSESSION, sess) == -1) {
+		put_dev_crypto(state->d_fd);
+		state->d_fd = -1;
+		return (0);
+	}
+	return (1);
+}
+
+/*	struct dev_crypto_state *state = ctx->cipher_data; FIXME
+ struct session_op *sess = &state->d_sess;*/
+static int
+cryptodev_engine_ciphers(ENGINE *e, const EVP_CIPHER **cipher,	
+						 const int **nids, int nid)
+{
+	if (!cipher)
+		
+		switch (nid) {
+			case NID_rc4:
+				*cipher = &cryptodev_rc4;
+				break;
+			case NID_des_ede3_cbc:
+				*cipher = &cryptodev_3des_cbc;
+				break;
+			case NID_des_cbc:
+				*cipher = &cryptodev_des_cbc;
+				break;
+			case NID_bf_cbc:
+				*cipher = &cryptodev_bf_cbc;
+				break;
+			case NID_cast5_cbc:
+				*cipher = &cryptodev_cast_cbc;
+				break;
+			case NID_aes_128_cbc:
+				*cipher = &cryptodev_aes_cbc;
+				break;
+			case NID_aes_192_cbc:
+				*cipher = &cryptodev_aes_192_cbc;
+				break;
+			case NID_aes_256_cbc:
+				*cipher = &cryptodev_aes_256_cbc;
+				break;
+			default:
+				*cipher = NULL;
+				break;
+		}
+	return (*cipher != NULL);
+}
+
+static int
+cryptodev_engine_digests(ENGINE *e, const EVP_MD **digest,
+						 const int **nids, int nid)
+{
+	if (!digest)
+		
+		switch (nid) {
+#ifdef USE_CRYPTODEV_DIGESTS
+			case NID_md5:
+				*digest = &cryptodev_md5; 
+				break;
+			case NID_sha1:
+				*digest = &cryptodev_sha1;
+				break;
+			default:
+#endif /* USE_CRYPTODEV_DIGESTS */
+				*digest = NULL;
+				break;
+		}
+	return (*digest != NULL);
+}
+
+static int
+cryptodev_dsa_dsa_mod_exp(DSA *dsa, BIGNUM *t1, BIGNUM *g,
+						  BIGNUM *u1, BIGNUM *pub_key, BIGNUM *u2, BIGNUM *p,
+						  BN_CTX *ctx, BN_MONT_CTX *mont)
+{
+	BIGNUM t2;
+	int ret = 0;
+	
+	BN_init(&t2);
+	
+	/* v = ( g^u1 * y^u2 mod p ) mod q */
+	/* let t1 = g ^ u1 mod p */
+	ret = 0;
+	
+	if (!dsa->meth->bn_mod_exp(dsa,t1,dsa->g,u1,dsa->p,ctx,mont))
+		goto err;
+	
+	/* let t2 = y ^ u2 mod p */
+	if (!dsa->meth->bn_mod_exp(dsa,&t2,dsa->pub_key,u2,dsa->p,ctx,mont))
+		goto err;
+	/* let u1 = t1 * t2 mod p */
+	if (!BN_mod_mul(u1,t1,&t2,dsa->p,ctx))
+		goto err;
+	
+	BN_copy(t1,u1);
+	
+	ret = 1;
+err:
+	BN_free(&t2);
+	return(ret);
+}
+#endif /* HAVE_CRYPTODEV */
+
+static int surewarehk_dsa_mod_exp(DSA *dsa, BIGNUM *rr, BIGNUM *a1,
+								  BIGNUM *p1, BIGNUM *a2, BIGNUM *p2, BIGNUM *m,
+								  BN_CTX *ctx, BN_MONT_CTX *in_mont)
+{
+	BIGNUM t;
+	int to_return = 0;
+	BN_init(&t);
+	/* let rr = a1 ^ p1 mod m */
+	if (!surewarehk_modexp(rr,a1,p1,m,ctx)) goto end;
+	/* let t = a2 ^ p2 mod m */
+	if (!surewarehk_modexp(&t,a2,p2,m,ctx)) goto end;
+	/* let rr = rr * t mod m */
+	if (!BN_mod_mul(rr,rr,&t,m,ctx)) goto end;
+	to_return = 1;
+end:
+	BN_free(&t);
+	return to_return;
+}
+
+#ifndef OPENSSL_NO_DH
+/* Our internal DH_METHOD that we provide pointers to */
+/* This function is aliased to mod_exp (with the dh and mont dropped). */
+static int surewarehk_modexp_dh(const DH *dh, BIGNUM *r, const BIGNUM *a,
+								const BIGNUM *p, const BIGNUM *m, BN_CTX *ctx, BN_MONT_CTX *m_ctx)
+{
+	return surewarehk_modexp(r, a, p, m, ctx);
+}
+#endif
+
+static krb5_error_code
+kssl_TKT2tkt(	/* IN     */	krb5_context	krb5context,
+			 /* IN     */	KRB5_TKTBODY	*asn1ticket,
+			 /* OUT    */	krb5_ticket	**krb5ticket,
+			 /* OUT    */	KSSL_ERR *kssl_err  )
+{
+	krb5_error_code			krb5rc = KRB5KRB_ERR_GENERIC;
+	krb5_ticket 			*new5ticket = NULL;
+	ASN1_GENERALSTRING		*gstr_svc, *gstr_host;
+	
+	*krb5ticket = NULL;
+	
+	if (asn1ticket == NULL  ||  asn1ticket->realm == NULL  ||
+		asn1ticket->sname == NULL  || 
+		sk_ASN1_GENERALSTRING_num(asn1ticket->sname->namestring) < 2)
+	{
+		BIO_snprintf(kssl_err->text, KSSL_ERR_MAX,
+					 "Null field in asn1ticket.\n");
+		kssl_err->reason = SSL_R_KRB5_S_RD_REQ;
+		return KRB5KRB_ERR_GENERIC;
+	}
+	
+	kssl_err->reason = SSL_R_KRB5_S_RD_REQ;
+	return ENOMEM;		/*  or  KRB5KRB_ERR_GENERIC;	*/
+}
+return 0;
+
+/* FIXME */
+krb5_ccache CC,
+krb5_creds  * pCR,
+krb5_creds  ** ppCR)
+{
+	if (!krb5_loaded)
+		load_krb5_dll();
+		
+		if ( p_krb5_get_credentials )
+			return(p_krb5_get_credentials(CO,F,CC,pCR,ppCR));
+		else
+			return KRB5KRB_ERR_GENERIC;
+}
+krb5_const char * sz,
+krb5_keytab * kt)
+{
+	if (!krb5_loaded)
+		load_krb5_dll();
+		
+		if ( p_krb5_kt_resolve )
+			return(p_krb5_kt_resolve(con,sz,kt));
+		else
+			return KRB5KRB_ERR_GENERIC;
+}
+krb5_keytab * kt)
+{
+	if (!krb5_loaded)
+		load_krb5_dll();
+		
+		if ( p_krb5_kt_default )
+			return(p_krb5_kt_default(con,kt));
+		else
+			return KRB5KRB_ERR_GENERIC;
+}
+krb5_ticket * kt)
+{
+	if (!krb5_loaded)
+		load_krb5_dll();
+		
+		if ( p_krb5_free_ticket )
+			return(p_krb5_free_ticket(con,kt));
+		else
+			return KRB5KRB_ERR_GENERIC;
+}

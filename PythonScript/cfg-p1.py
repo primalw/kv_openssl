@@ -1303,7 +1303,7 @@ def main(argv) :
     ''' Has to be the root path of the code base '''
     path = "/Volumes/work/Phd/ECDH/kv_openssl/"
     ''' Name of the looked function '''
-    functionName = "ecdh_low"
+    functionName = "STACK_OF"
 
     recFuncSearch(path, functionName,".")
     varSearch(path)
