@@ -1107,6 +1107,8 @@ def recFuncSearch(rootPath, funcName, rootFile):
         fDeclaration.append("\n")
         
     patterns = [ "^\s*"+fHdrCln+"\s*\(.*[^;]\s*$", "^\s*[^\W]\S+.*[^\W]\s+\*?("+funcName+")\s*\(.*[^;]\s*$"]
+    funcNameCln = []
+    fListCln = [] 
     
     ''' Search begins for function definitions '''
     for pattern in patterns:
@@ -1267,8 +1269,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                         #print orgLine,
                                         preProcessorQ.append(orgLine)
 
-                    ''' Cleaning potential function calls '''
-                    fListCln = []                    
+                    ''' Cleaning potential function calls '''                   
                     for fListItem in fList:   
                         funcNameCln = cleanFunctionName(fListItem) 
                         if ( ( not funcNameCln in reserveWords ) and len(funcNameCln) > 0 ):                        
@@ -1276,15 +1277,15 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                 print "Adding Function "+funcNameCln
                                 fListCln.append(funcNameCln)
 
-                    ''' Begins the recursive search for confirmed function calls '''
-                    for funcNameCln in fListCln:
-                        recFuncSearch(rootPath, funcNameCln, str(root)+"/"+filename)
-
                     if ( found and not mcrCount ):
-                        return
+                        break
 
                 if ( found ):
-                    return
+                    break
+                
+    ''' Begins the recursive search for confirmed function calls '''
+    for funcNameCln in fListCln:
+        recFuncSearch(rootPath, funcNameCln, str(root)+"/"+filename)
 
     if ( not found ):
         #print "Function Body is not found - "+ funcName
