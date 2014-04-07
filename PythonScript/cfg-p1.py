@@ -774,6 +774,7 @@ def recFuncSearch(rootPath, funcName, rootFile):
                     sCount = 0
                     eCount = 0
                     inMacro = False
+                    McrDef = False
                     orgLine = ""
                     mcrCount = 0
                     preProcessorQ = deque()
@@ -875,7 +876,8 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                     ''' if the function is a macro '''
                                     if ( re.findall("^\s*#\s*.*$", orgLine) ):
                                         done = True
-                                        fDeclaration.append("/* file: "+funcName+" : "+str(root) + str(filename)+" */\n")
+                                        McrDef = True
+                                        fDefPre.append("/* file: "+funcName+" : "+str(root) + str(filename)+" */\n")
                                         
                                         for i in range( len(preProcessorQ) ):
                                             fDefPre.append(preProcessorQ.popleft())
@@ -1027,7 +1029,10 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                         #print lineNum
                                         if ( found ):
                                             #print orgLine,
-                                            fDeclaration.append(orgLine)
+                                            if ( McrDef ):
+                                                fDefPre.append(orgLine)
+                                            else:
+                                                fDeclaration.append(orgLine)
                                             if ( not mcrCount ):
                                                 break
                                             
@@ -1038,11 +1043,20 @@ def recFuncSearch(rootPath, funcName, rootFile):
                                     gSkip = True
                                     if ( found and not preProcessorQIgn and mcrCount):
                                         #print orgLine,
-                                        fDeclaration.append(orgLine)
+                                        if ( McrDef ):
+                                            fDefPre.append(orgLine)
+                                        else:
+                                            fDeclaration.append(orgLine)
 
                                 if ( re.findall('^#\s*elif.*', orgLine) and found ):
                                     #print orgLine,
-                                    preProcessorQ.append(orgLine)
+                                    if ( found ):
+                                        preProcessorQ.append(orgLine)
+                                    else:
+                                        if ( McrDef ):
+                                            fDefPre.append(orgLine)
+                                        else:
+                                            fDeclaration.append(orgLine)
                                 
 
                         ''' If the function header is within preprocessor directive keep on looking for alternative delarations'''
@@ -1294,8 +1308,13 @@ def main(argv) :
     varSearch(path)
 
     ''' Writing all the header declarations '''
-    if ( len(dDefinition) or len(fDeclaration)  ):
+    if ( len(dDefinition) or len(fDeclaration) or len(fDefPre) ):
         thefile = open(functionName+".h",'w')
+
+        for i in range( len(fDefPre) ):
+            thefile.write(fDefPre.popleft())
+
+        thefile.write("/********** Global Variabls and Structures **********/ \n")
 
         for i in range( len(dDefinition) ):
             tempCode = dDefinition.pop()
