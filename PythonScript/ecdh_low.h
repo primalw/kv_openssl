@@ -9,6 +9,13 @@ extern "C" {
 #define STACK_OF(type) struct stack_st_##type
 #define ERR_NUM_ERRORS	16
 #define BN_CTX_POOL_SIZE	16
+#define KEYSIZB 1024 /* should hit tty line limit first :-) */
+#define CRYPTO_MEM_CHECK_OFF	0x0	/* an enume */
+#define CRYPTO_NUM_LOCKS		41
+#define SHA_DIGEST_LENGTH 20
+#define MD_DIGEST_LENGTH	SHA_DIGEST_LENGTH
+#define V_ASN1_OCTET_STRING		4
+#define TYPE    unsigned int
 
 #define MS_FAR /* FIXME */
 
@@ -745,7 +752,6 @@ struct crypto_ex_data_st
 	STACK_OF(void) *sk;
 };
 
-
 typedef struct
 {
 	int references;
@@ -833,7 +839,8 @@ struct env_md_st
 	int ctx_size; /* how big does the ctx->md_data need to be */
 	/* control function */
 	} /* EVP_MD */;
-#define EVP_MD_FLAG_ONESHOT	0x0001 #define EVP_PKEY_NULL_method	NULL,NULL,{0,0,0,0}
+#define EVP_MD_FLAG_ONESHOT	0x0001 
+#define EVP_PKEY_NULL_method	NULL,NULL,{0,0,0,0}
 #endif /* !EVP_MD */
 
 
@@ -872,8 +879,7 @@ struct st_ERR_FNS
 	};
 
 
-#ifndef HAVE_CRYPTODEV
-#else 
+#ifdef HAVE_CRYPTODEV
 struct dev_crypto_state {
 	struct session_op d_sess;
 	int d_fd;
@@ -932,7 +938,9 @@ struct st_CRYPTO_EX_DATA_IMPL
 	/* Cleanup a CRYPTO_EX_DATA of a given class */
 	};
 
+static const CRYPTO_EX_DATA_IMPL *impl = NULL;
 
+typedef struct st_CRYPTO_EX_DATA_IMPL	CRYPTO_EX_DATA_IMPL;
 
 #if !defined(OPENSSL_NO_DES) && !defined(OPENSSL_NO_SHA1)
 const EVP_CIPHER *enc;
@@ -1544,6 +1552,7 @@ typedef struct X509_POLICY_CACHE_st X509_POLICY_CACHE;
 
 typedef struct ssl_ctx_st SSL_CTX;
 
+static SSL_CTX *ctx=NULL;
 
 typedef struct st_ERR_FNS ERR_FNS;
 
@@ -1552,10 +1561,6 @@ typedef struct x509_crl_method_st X509_CRL_METHOD;
 
 
 typedef struct X509_algor_st X509_ALGOR;
-
-
-
-typedef struct st_CRYPTO_EX_DATA_IMPL	CRYPTO_EX_DATA_IMPL;
 
 
 #ifdef OPENSSL_NO_CAST
@@ -2090,20 +2095,6 @@ static long options =             /* extra information to be recorded */
 	0;
 
 
-typedef struct mem_st
-/* memory-block description */
-	{
-	void *addr;
-	int num;
-	const char *file;
-	int line;
-	CRYPTO_THREADID threadid;
-	unsigned long order;
-	time_t time;
-	APP_INFO *app_info;
-	} MEM;
-
-
 typedef struct app_mem_info_st
 /* For application-defined information (static C-string `info')
  * to be displayed in memory leak list.
@@ -2120,15 +2111,25 @@ typedef struct app_mem_info_st
 	struct app_mem_info_st *next; /* tail of thread's stack */
 	int references;
 	} APP_INFO;
+	
+typedef struct mem_st
+/* memory-block description */
+{
+	void *addr;
+	int num;
+	const char *file;
+	int line;
+	CRYPTO_THREADID threadid;
+	unsigned long order;
+	time_t time;
+	APP_INFO *app_info;
+} MEM;
 
 
 static int mh_mode=CRYPTO_MEM_CHECK_OFF;
 
 
 unsigned char cleanse_ctr = 0;
-
-
-static const CRYPTO_EX_DATA_IMPL *impl = NULL;
 
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -2193,17 +2194,9 @@ static const char* const lock_names[CRYPTO_NUM_LOCKS] =
 
 static unsigned long a[4]={0x01234567,0x89ABCDEF,0xFEDCBA98,0x76543210};
 
-
 TYPE b;
 
-
-
-static SSL_CTX *ctx=NULL;
-
-
-
 static int allow_customize = 1;      /* we provide flexible functions for */
-
 
 static int allow_customize_debug = 1;
 
@@ -2222,6 +2215,29 @@ struct bignum_st
 
 typedef struct bignum_st BIGNUM;
 
+typedef struct bignum_pool_item
+{
+	/* The bignum values */
+	BIGNUM vals[BN_CTX_POOL_SIZE];
+	/* Linked-list admin */
+	struct bignum_pool_item *prev, *next;
+} BN_POOL_ITEM;
+
+typedef struct bignum_pool
+{
+	/* Linked-list admin */
+	BN_POOL_ITEM *head, *current, *tail;
+	/* Stack depth and allocation size */
+	unsigned used, size;
+} BN_POOL;
+
+typedef struct bignum_ctx_stack
+{
+	/* Array of indexes into the bignum stack */
+	unsigned int *indexes;
+	/* Number of stack frames, and the size of the allocated array */
+	unsigned int depth, size;
+} BN_STACK;
 
 struct bignum_ctx
 	{
@@ -2240,32 +2256,9 @@ struct bignum_ctx
 
 char key[KEYSIZB+1];
 
+struct sockaddr_in addr;
 
-	return num;
-
-
-	struct sockaddr_in addr;
-
-
-	    struct sockaddr_in addr;
-
-
-typedef struct bignum_pool
-	{
-	/* Linked-list admin */
-	BN_POOL_ITEM *head, *current, *tail;
-	/* Stack depth and allocation size */
-	unsigned used, size;
-	} BN_POOL;
-
-
-typedef struct bignum_ctx_stack
-	{
-	/* Array of indexes into the bignum stack */
-	unsigned int *indexes;
-	/* Number of stack frames, and the size of the allocated array */
-	unsigned int depth, size;
-	} BN_STACK;
+struct sockaddr_in addr;
 
 
 struct dh_method
@@ -2296,6 +2289,114 @@ struct ecdsa_method
 	char *app_data;
 	};
 
+struct store_st
+{
+	const struct STORE_METHOD *meth;
+	/* functional reference if 'meth' is ENGINE-provided */
+	struct ENGINE *engine;
+	
+	struct CRYPTO_EX_DATA ex_data;
+	int references;
+};
+
+
+typedef struct store_st STORE;
+
+/* Store functions take a type code for the type of data they should store
+ or fetch */
+typedef enum STORE_object_types
+{
+	STORE_OBJECT_TYPE_X509_CERTIFICATE=	0x01, /* X509 * */
+	STORE_OBJECT_TYPE_X509_CRL=		0x02, /* X509_CRL * */
+	STORE_OBJECT_TYPE_PRIVATE_KEY=		0x03, /* EVP_PKEY * */
+	STORE_OBJECT_TYPE_PUBLIC_KEY=		0x04, /* EVP_PKEY * */
+	STORE_OBJECT_TYPE_NUMBER=		0x05, /* BIGNUM * */
+	STORE_OBJECT_TYPE_ARBITRARY=		0x06, /* BUF_MEM * */
+	STORE_OBJECT_TYPE_NUM=			0x06  /* The amount of known
+										   object types */
+} STORE_OBJECT_TYPES;
+
+typedef struct openssl_item_st
+{
+	int code;
+	void *value;		/* Not used for flag attributes */
+	size_t value_size;	/* Max size of value for output, length for input */
+	size_t *value_length;	/* Returned length of value for output */
+} OPENSSL_ITEM;
+
+typedef enum STORE_certificate_status
+{
+	STORE_X509_VALID=			0x00,
+	STORE_X509_EXPIRED=			0x01,
+	STORE_X509_SUSPENDED=			0x02,
+	STORE_X509_REVOKED=			0x03
+} STORE_CERTIFICATE_STATUS;
+
+typedef struct STORE_OBJECT_st
+{
+	STORE_OBJECT_TYPES type;
+	union
+	{
+		struct
+		{
+			STORE_CERTIFICATE_STATUS status;
+			X509 *certificate;
+		} x509;
+		struct X509_CRL *crl;
+		EVP_PKEY *key;
+		BIGNUM *number;
+		struct BUF_MEM *arbitrary;
+	} data;
+} STORE_OBJECT;
+
+
+/********** Headers **********/ 
+/* file: STORE_INITIALISE_FUNC_PTR : /Volumes/work/Phd/ECDH/kv_openssl/crypto/storestore.h */
+/* These callback types are use for store handlers */
+typedef int (*STORE_INITIALISE_FUNC_PTR)(STORE *);
+typedef void (*STORE_CLEANUP_FUNC_PTR)(STORE *);
+typedef STORE_OBJECT *(*STORE_GENERATE_OBJECT_FUNC_PTR)(STORE *, STORE_OBJECT_TYPES type, OPENSSL_ITEM attributes[], OPENSSL_ITEM parameters[]);
+typedef STORE_OBJECT *(*STORE_GET_OBJECT_FUNC_PTR)(STORE *, STORE_OBJECT_TYPES type, OPENSSL_ITEM attributes[], OPENSSL_ITEM parameters[]);
+typedef void *(*STORE_START_OBJECT_FUNC_PTR)(STORE *, STORE_OBJECT_TYPES type, OPENSSL_ITEM attributes[], OPENSSL_ITEM parameters[]);
+typedef STORE_OBJECT *(*STORE_NEXT_OBJECT_FUNC_PTR)(STORE *, void *handle);
+typedef int (*STORE_END_OBJECT_FUNC_PTR)(STORE *, void *handle);
+typedef int (*STORE_HANDLE_OBJECT_FUNC_PTR)(STORE *, STORE_OBJECT_TYPES type, OPENSSL_ITEM attributes[], OPENSSL_ITEM parameters[]);
+typedef int (*STORE_STORE_OBJECT_FUNC_PTR)(STORE *, STORE_OBJECT_TYPES type, STORE_OBJECT *data, OPENSSL_ITEM attributes[], OPENSSL_ITEM parameters[]);
+typedef int (*STORE_MODIFY_OBJECT_FUNC_PTR)(STORE *, STORE_OBJECT_TYPES type, OPENSSL_ITEM search_attributes[], OPENSSL_ITEM add_attributes[], OPENSSL_ITEM modify_attributes[], OPENSSL_ITEM delete_attributes[], OPENSSL_ITEM parameters[]);
+typedef int (*STORE_GENERIC_FUNC_PTR)(STORE *, OPENSSL_ITEM attributes[], OPENSSL_ITEM parameters[]);
+typedef int (*STORE_CTRL_FUNC_PTR)(STORE *, int cmd, long l, void *p, void (*f)(void));
+
+int STORE_method_set_initialise_function(struct STORE_METHOD *sm, STORE_INITIALISE_FUNC_PTR init_f);
+int STORE_method_set_cleanup_function(struct STORE_METHOD *sm, STORE_CLEANUP_FUNC_PTR clean_f);
+int STORE_method_set_generate_function(struct STORE_METHOD *sm, STORE_GENERATE_OBJECT_FUNC_PTR generate_f);
+int STORE_method_set_get_function(struct STORE_METHOD *sm, STORE_GET_OBJECT_FUNC_PTR get_f);
+int STORE_method_set_store_function(struct STORE_METHOD *sm, STORE_STORE_OBJECT_FUNC_PTR store_f);
+int STORE_method_set_modify_function(struct STORE_METHOD *sm, STORE_MODIFY_OBJECT_FUNC_PTR store_f);
+int STORE_method_set_revoke_function(struct STORE_METHOD *sm, STORE_HANDLE_OBJECT_FUNC_PTR revoke_f);
+int STORE_method_set_delete_function(struct STORE_METHOD *sm, STORE_HANDLE_OBJECT_FUNC_PTR delete_f);
+int STORE_method_set_list_start_function(struct STORE_METHOD *sm, STORE_START_OBJECT_FUNC_PTR list_start_f);
+int STORE_method_set_list_next_function(struct STORE_METHOD *sm, STORE_NEXT_OBJECT_FUNC_PTR list_next_f);
+int STORE_method_set_list_end_function(struct STORE_METHOD *sm, STORE_END_OBJECT_FUNC_PTR list_end_f);
+int STORE_method_set_update_store_function(struct STORE_METHOD *sm, STORE_GENERIC_FUNC_PTR);
+int STORE_method_set_lock_store_function(struct STORE_METHOD *sm, STORE_GENERIC_FUNC_PTR);
+int STORE_method_set_unlock_store_function(struct STORE_METHOD *sm, STORE_GENERIC_FUNC_PTR);
+int STORE_method_set_ctrl_function(struct STORE_METHOD *sm, STORE_CTRL_FUNC_PTR ctrl_f);
+
+STORE_INITIALISE_FUNC_PTR STORE_method_get_initialise_function(struct STORE_METHOD *sm);
+STORE_CLEANUP_FUNC_PTR STORE_method_get_cleanup_function(struct STORE_METHOD *sm);
+STORE_GENERATE_OBJECT_FUNC_PTR STORE_method_get_generate_function(struct STORE_METHOD *sm);
+STORE_GET_OBJECT_FUNC_PTR STORE_method_get_get_function(struct STORE_METHOD *sm);
+STORE_STORE_OBJECT_FUNC_PTR STORE_method_get_store_function(struct STORE_METHOD *sm);
+STORE_MODIFY_OBJECT_FUNC_PTR STORE_method_get_modify_function(struct STORE_METHOD *sm);
+STORE_HANDLE_OBJECT_FUNC_PTR STORE_method_get_revoke_function(struct STORE_METHOD *sm);
+STORE_HANDLE_OBJECT_FUNC_PTR STORE_method_get_delete_function(struct STORE_METHOD *sm);
+STORE_START_OBJECT_FUNC_PTR STORE_method_get_list_start_function(struct STORE_METHOD *sm);
+STORE_NEXT_OBJECT_FUNC_PTR STORE_method_get_list_next_function(struct STORE_METHOD *sm);
+STORE_END_OBJECT_FUNC_PTR STORE_method_get_list_end_function(struct STORE_METHOD *sm);
+STORE_GENERIC_FUNC_PTR STORE_method_get_update_store_function(struct STORE_METHOD *sm);
+STORE_GENERIC_FUNC_PTR STORE_method_get_lock_store_function(struct STORE_METHOD *sm);
+STORE_GENERIC_FUNC_PTR STORE_method_get_unlock_store_function(struct STORE_METHOD *sm);
+STORE_CTRL_FUNC_PTR STORE_method_get_ctrl_function(struct STORE_METHOD *sm);
 
 struct store_method_st
 	{
@@ -2338,16 +2439,6 @@ struct store_method_st
 	/* Generic control function */
 	STORE_CTRL_FUNC_PTR ctrl;
 	};
-
-
-typedef struct bignum_pool_item
-	{
-	/* The bignum values */
-	BIGNUM vals[BN_CTX_POOL_SIZE];
-	/* Linked-list admin */
-	struct bignum_pool_item *prev, *next;
-	} BN_POOL_ITEM;
-
 
 typedef struct IPAddressFamily_st {
   ASN1_OCTET_STRING	*addressFamily;
@@ -2567,11 +2658,6 @@ typedef enum {
 	POINT_CONVERSION_HYBRID = 6
 } point_conversion_form_t;
 
-
-				ASN1_BIT_STRING *bits,
-				STACK_OF(CONF_VALUE) *extlist);
-
-
 typedef struct GENERAL_NAME_st {
 
 #define GEN_OTHERNAME	0
@@ -2625,12 +2711,6 @@ void *db;
 
 struct v3_ext_ctx;
 
-
-
-					 X509_EXTENSION *ex, int loc);
-
-
-
 struct X509_name_st
 	{
 	STACK_OF(X509_NAME_ENTRY) *entries;
@@ -2668,24 +2748,9 @@ typedef struct stack_st
 
 typedef char *OPENSSL_STRING;
 
-
-
-
 struct rand_meth_st
 	{
 	};
-
-
-
-	pem_password_cb *cb, void *u);
-
-
-		      pem_password_cb *cb, void *u);
-
-
-
-const void *	OBJ_bsearch_ex_(const void *key,const void *base,int num,
-				int size,
 
 #define _DECLARE_OBJ_BSEARCH_CMP_FN(scope, type1, type2, nm)	\
 
@@ -2699,29 +2764,12 @@ ASN1_OBJECT *	OBJ_nid2obj(int n);
 ASN1_OBJECT *	OBJ_dup(const ASN1_OBJECT *o);
 
 
-
-
 typedef struct { u64 hi,lo; } u128;
-
-
 
 struct evp_pkey_method_st
 	{
 	int pkey_id;
 	int flags;
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 	} /* EVP_PKEY_METHOD */;
 
@@ -2749,18 +2797,6 @@ struct evp_pkey_ctx_st
 	int keygen_info_count;
 	} /* EVP_PKEY_CTX */;
 
-
-
-			long length);
-
-
-			long length);
-
-
-			long length);
-
-
-
 typedef struct err_state_st
 	{
 	CRYPTO_THREADID tid;
@@ -2772,9 +2808,6 @@ typedef struct err_state_st
 	int err_line[ERR_NUM_ERRORS];
 	int top,bottom;
 	} ERR_STATE;
-
-
-
 
 typedef struct ENGINE_CMD_DEFN_st
 	{
@@ -3054,12 +3087,6 @@ struct dh_st
 # define OPENSSL_DH_MAX_MODULUS_BITS	10000
 #endif
 
-
-
-				       const char *section);
-
-
-
 typedef struct
 	{
 	char *section;
@@ -3067,15 +3094,9 @@ typedef struct
 	char *value;
 	} CONF_VALUE;
 
-
-
 char *	BUF_strndup(const char *str, size_t siz);
 
-
 char *	BUF_strdup(const char *str);
-
-
-
 
 struct bn_mont_ctx_st
 	{
@@ -3098,42 +3119,26 @@ struct evp_pkey_asn1_method_st
 	char *pem_str;
 	char *info;
 
-
-
-
-
-
-
 	/* Legacy functions for old PEM */
 
 	/* Custom ASN1 signature verification */
 
 	} /* EVP_PKEY_ASN1_METHOD */;
 
-
-			      const unsigned char **pp,
-			      long length, d2i_of_void *d2i,
-
 #ifndef OPENSSL_NO_BIO
 #endif /* FIXME */
 
-
 ASN1_STRING *	ASN1_STRING_type_new(int type );
 
-
 ASN1_STRING *	ASN1_STRING_new(void);
-
 
 ASN1_OBJECT *	d2i_ASN1_OBJECT(ASN1_OBJECT **a,const unsigned char **pp,
 			long length);
 
-
 ASN1_OBJECT *	c2i_ASN1_OBJECT(ASN1_OBJECT **a,const unsigned char **pp,
 			long length);
-
-
+			
 ASN1_OBJECT *	ASN1_OBJECT_new(void );
-
 
 typedef struct asn1_type_st
 	{
@@ -3269,6 +3274,7 @@ extern const unsigned char os_toascii[256];
 #  endif
 
 /********** Headers **********/ 
+static void *default_malloc_ex(size_t num, const char *file, int line);
 
 /* file: EC_KEY_new_by_curve_name : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
 EC_KEY *EC_KEY_new_by_curve_name(int nid);
@@ -3792,8 +3798,8 @@ static void (MS_FAR *locking_callback)(int mode,int type,
 /* file: malloc_ex_func : /Volumes/work/Phd/ECDH/kv_openssl/cryptomem.c */
 static void *(*malloc_ex_func)(size_t, const char *file, int line)
         = default_malloc_ex;
-/* file: default_malloc_ex : /Volumes/work/Phd/ECDH/kv_openssl/cryptomem.c */
-static void *default_malloc_ex(size_t num, const char *file, int line)  { return malloc_func(num); } /* file: malloc_func : /Volumes/work/Phd/ECDH/kv_openssl/cryptomem.c */
+
+/* file: malloc_func : /Volumes/work/Phd/ECDH/kv_openssl/cryptomem.c */
 static void *(*malloc_func)(size_t)         = malloc;
 
 /* file: EC_GROUP_new_by_curve_name : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
@@ -3840,7 +3846,12 @@ void EC_GROUP_clear_free(EC_GROUP *group);
 void EC_EX_DATA_clear_free_all_data(EC_EXTRA_DATA **);
 
 /* file: clear_free_func : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
-	void *(*dup_func)(void *), void (*free_func)(void *), void (*clear_free_func)(void *));
+void *EC_KEY_get_key_method_data(EC_KEY *key, 
+								 void *(*dup_func)(void *), void (*free_func)(void *), void (*clear_free_func)(void *));
+
+void *EC_KEY_insert_key_method_data(EC_KEY *key, void *data,
+									void *(*dup_func)(void *), void (*free_func)(void *), void (*clear_free_func)(void *));
+
 
 /* file: EC_POINT_clear_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
 void EC_POINT_clear_free(EC_POINT *point);
@@ -4038,7 +4049,7 @@ ENGINE *ENGINE_get_default_ECDH(void);
 const ECDH_METHOD *ENGINE_get_ECDH(const ENGINE *e);
 
 /* file: CRYPTO_new_ex_data : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
-int CRYPTO_new_ex_data(int class_index, void *obj, CRYPTO_EX_DATA *ad);
+int CRYPTO_new_ex_data(int class_index, void *obj, struct CRYPTO_EX_DATA *ad);
 
 
 /* file: EC_KEY_insert_key_method_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
