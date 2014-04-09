@@ -10675,3 +10675,90 @@ krb5_ticket * kt)
 		else
 			return KRB5KRB_ERR_GENERIC;
 }
+
+#ifndef OPENSSL_NO_KRB5
+#if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_WIN32)
+
+krb5_const krb5_flags F,
+krb5_data  * pD1,
+krb5_creds  * pC,
+krb5_data  * pD2)
+{
+	if (!krb5_loaded)
+		load_krb5_dll();
+		
+		if ( p_krb5_mk_req_extended )
+			return(p_krb5_mk_req_extended(CO,pACO,F,pD1,pC,pD2));
+		else
+			return KRB5KRB_ERR_GENERIC;
+}
+krb5_auth_context  * pACO)
+{
+	if (!krb5_loaded)
+		load_krb5_dll();
+		
+		if ( p_krb5_auth_con_init )
+			return(p_krb5_auth_con_init(CO,pACO));
+		else
+			return KRB5KRB_ERR_GENERIC;
+}
+krb5_const krb5_flags F,
+krb5_ccache CC,
+krb5_creds  * pCR,
+krb5_creds  ** ppCR)
+{
+	if (!krb5_loaded)
+		load_krb5_dll();
+		
+		if ( p_krb5_get_credentials )
+			return(p_krb5_get_credentials(CO,F,CC,pCR,ppCR));
+		else
+			return KRB5KRB_ERR_GENERIC;
+}
+krb5_const char  * pC1,
+krb5_const char  * pC2,
+krb5_int32 I,
+krb5_principal  * pPR)
+{
+	if (!krb5_loaded)
+		load_krb5_dll();
+		
+		if ( p_krb5_sname_to_principal )
+			return(p_krb5_sname_to_principal(CO,pC1,pC2,I,pPR));
+		else
+			return KRB5KRB_ERR_GENERIC;
+}
+#ifndef NO_DEF_KRB5_CCACHE
+typedef	krb5_pointer	krb5_cc_cursor;	/* cursor for sequential lookup */
+#endif /* NO_DEF_KRB5_CCACHE */
+#endif  /* OPENSSL_SYS_WINDOWS || OPENSSL_SYS_WIN32 */
+const EVP_CIPHER *
+kssl_map_enc(krb5_enctype enctype)
+{
+	switch (enctype)
+	{
+		case ENCTYPE_DES_HMAC_SHA1:		/*    EVP_des_cbc();       */
+		case ENCTYPE_DES_CBC_CRC:
+		case ENCTYPE_DES_CBC_MD4:
+		case ENCTYPE_DES_CBC_MD5:
+		case ENCTYPE_DES_CBC_RAW:
+			break;
+		case ENCTYPE_DES3_CBC_SHA1:		/*    EVP_des_ede3_cbc();  */
+		case ENCTYPE_DES3_CBC_SHA:
+		case ENCTYPE_DES3_CBC_RAW:
+			break;
+		default:                return NULL;
+			break;
+	}
+}
+#endif	/* !OPENSSL_NO_KRB5	*/
+
+/* file: default_malloc_ex : /Volumes/work/Phd/ECDH/kv_openssl/cryptomem.c */
+static void *default_malloc_ex(size_t num, const char *file, int line)  { return malloc_func(num); } 
+
+/* file: int_table_check : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_table.c */
+static int int_table_check(ENGINE_TABLE **t, int create) 	{
+	LHASH_OF(ENGINE_PILE) *lh; 
+	if(*t) return 1;  if(!create) return 0;  if((lh = lh_ENGINE_PILE_new()) == NULL) 		return 0;
+	*t = (ENGINE_TABLE *)lh; 	return 1;
+}
