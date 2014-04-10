@@ -2,12 +2,14 @@
 #include <memory.h>
 #include <time.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #define STACK_OF(type) struct stack_st_##type
+#define DECLARE_LHASH_OF(type) LHASH_OF(type) { int dummy; }
 #define LHASH_OF(type) struct lhash_st_##type
 #define ERR_NUM_ERRORS	16
 #define BN_CTX_POOL_SIZE	16
@@ -27,6 +29,12 @@ extern "C" {
 #define SSL_MAX_KRB5_PRINCIPAL_LENGTH  256
 
 #define MS_FAR /* FIXME */
+
+#ifdef HAVE_LONG_DOUBLE
+#define LDOUBLE long double
+#else
+#define LDOUBLE double
+#endif
 
 #ifdef THIRTY_TWO_BIT
 #ifdef BN_LLONG
@@ -874,8 +882,6 @@ asm ("dmultu	%2,%3"		\
 
 #ifdef NO_ASN1_TYPEDEFS
 #define ASN1_NULL		int
-#else
-	typedef int ASN1_NULL;
 #endif
 	
 #ifndef OPENSSL_NO_KRB5
@@ -1031,6 +1037,8 @@ asm ("dmultu	%2,%3"		\
 # define LLONG long long
 # endif
 #endif /* FIXME */
+
+#define LLONG long long
 	
 #define ASN1_FLAG_EXP_MAX	20
 	
@@ -1819,26 +1827,6 @@ asm ("dmultu	%2,%3"		\
 
 	static const RAND_METHOD *default_RAND_meth = NULL;
 	
-	
-#ifndef OPENSSL_NO_DSA
-	/* FIXME */
-	/*static DSA_METHOD surewarehk_dsa =
-	{
-		"SureWare DSA method", 
-		surewarehk_dsa_do_sign,
-		NULL,/*sign setup*
-		NULL,/*verify,*
-		surewarehk_dsa_mod_exp,/*mod exp*
-		NULL,/*bn mod exp*
-		NULL, /*init*
-		NULL,/*finish*
-		0,
-		NULL,
-		NULL,
-		NULL
-	};*/
-#endif
-	
 	typedef struct err_state_st
 	{
 		CRYPTO_THREADID tid;
@@ -2184,6 +2172,13 @@ asm ("dmultu	%2,%3"		\
 	typedef struct evp_pkey_ctx_st EVP_PKEY_CTX;
 	typedef struct bio_st BIO;
 	typedef struct ASIdentifiers_st ASIdentifiers;
+	typedef struct x509_store_ctx_st X509_STORE_CTX;
+	typedef struct x509_store_st X509_STORE;
+	typedef struct X509_POLICY_NODE_st X509_POLICY_NODE;
+	typedef struct X509_POLICY_LEVEL_st X509_POLICY_LEVEL;
+	typedef struct X509_POLICY_TREE_st X509_POLICY_TREE;
+	typedef struct v3_ext_ctx X509V3_CTX;
+	typedef struct v3_ext_method X509V3_EXT_METHOD;
 
 	typedef int (*STORE_INITIALISE_FUNC_PTR)(STORE *);
 	typedef void (*STORE_CLEANUP_FUNC_PTR)(STORE *);
@@ -2218,19 +2213,26 @@ asm ("dmultu	%2,%3"		\
 	typedef void * (*X509V3_EXT_D2I)(void *, const unsigned char ** , long);
 	typedef int (*X509V3_EXT_I2D)(void *, unsigned char **);
 	typedef STACK_OF(CONF_VALUE) *
-	(*X509V3_EXT_I2V)(const struct v3_ext_method *method, void *ext,
+	(*X509V3_EXT_I2V)(const X509V3_EXT_METHOD *method, void *ext,
 					  STACK_OF(CONF_VALUE) *extlist);
-	typedef void * (*X509V3_EXT_V2I)(const struct v3_ext_method *method,
-									 struct v3_ext_ctx *ctx,
+	typedef void * (*X509V3_EXT_V2I)(const X509V3_EXT_METHOD *method,
+									 X509V3_CTX *ctx,
 									 STACK_OF(CONF_VALUE) *values);
-	typedef char * (*X509V3_EXT_I2S)(const struct v3_ext_method *method, void *ext);
-	typedef void * (*X509V3_EXT_S2I)(const struct v3_ext_method *method,
-									 struct v3_ext_ctx *ctx, const char *str);
-	typedef int (*X509V3_EXT_I2R)(const struct v3_ext_method *method, void *ext,
+	typedef char * (*X509V3_EXT_I2S)(const X509V3_EXT_METHOD *method, void *ext);
+	typedef void * (*X509V3_EXT_S2I)(const X509V3_EXT_METHOD *method,
+									 X509V3_CTX *ctx, const char *str);
+	typedef int (*X509V3_EXT_I2R)(const X509V3_EXT_METHOD *method, void *ext,
 								  BIO *out, int indent);
-	typedef void * (*X509V3_EXT_R2I)(const struct v3_ext_method *method,
-									 struct v3_ext_ctx *ctx, const char *str);
+	typedef void * (*X509V3_EXT_R2I)(const X509V3_EXT_METHOD *method,
+									 X509V3_CTX *ctx, const char *str);
 	typedef void bio_info_cb(struct bio_st *, int, const char *, int, long, long);
+#if 1
+	/* "userdata": new with OpenSSL 0.9.4 */
+	typedef int pem_password_cb(char *buf, int size, int rwflag, void *userdata);
+#else
+	/* OpenSSL 0.9.3, 0.9.3a */
+	typedef int pem_password_cb(char *buf, int size, int rwflag);
+#endif
 	
 	struct store_method_st
 	{
@@ -2347,7 +2349,7 @@ asm ("dmultu	%2,%3"		\
 		STACK_OF(X509_ATTRIBUTE) *attributes; /* [ 0 ] */
 	} /* EVP_PKEY */;
 	
-	typedef struct STORE_OBJECT_st
+	struct STORE_OBJECT_st
 	{
 		STORE_OBJECT_TYPES type;
 		union
@@ -2362,7 +2364,7 @@ asm ("dmultu	%2,%3"		\
 			BIGNUM *number;
 			struct BUF_MEM *arbitrary;
 		} data;
-	} STORE_OBJECT;
+	};
 	
 	struct store_st
 	{
@@ -2406,7 +2408,7 @@ asm ("dmultu	%2,%3"		\
 		X509_CERT_AUX *aux;
 	} /* X509 */;
 	
-	typedef struct x509_cinf_st
+	struct x509_cinf_st
 	{
 		ASN1_INTEGER *version;		/* [ 0 ] default of v1 */
 		ASN1_INTEGER *serialNumber;
@@ -2583,8 +2585,6 @@ asm ("dmultu	%2,%3"		\
 		/* Maybe more here */
 	};
 	
-	typedef struct v3_ext_ctx X509V3_CTX;
-	
 	struct evp_pkey_ctx_st
 	{
 		/* Method associated with this operation */
@@ -2671,8 +2671,6 @@ asm ("dmultu	%2,%3"		\
 		void *usr_data;	/* Any extension specific data */
 	};
 	
-	typedef struct v3_ext_method X509V3_EXT_METHOD;
-	
 	typedef struct bio_method_st
 	{
 		int type;
@@ -2756,7 +2754,7 @@ asm ("dmultu	%2,%3"		\
 #endif  /* OPENSSL_SYS_WINDOWS || OPENSSL_SYS_WIN32 */
 #endif	/* !OPENSSL_NO_KRB5	*/
 
-	typedef struct ASIdentifiers_st {
+	struct ASIdentifiers_st {
 		ASIdentifierChoice *asnum, *rdi;
 	};
 	
@@ -2765,6 +2763,373 @@ asm ("dmultu	%2,%3"		\
 		IPAddressChoice	*ipAddressChoice;
 	} IPAddressFamily;
 	
+	typedef struct X509_VERIFY_PARAM_st
+	{
+		char *name;
+		time_t check_time;	/* Time to use */
+		unsigned long inh_flags; /* Inheritance flags */
+		unsigned long flags;	/* Various verify flags */
+		int purpose;		/* purpose to check untrusted certificates */
+		int trust;		/* trust setting to check */
+		int depth;		/* Verify depth */
+		STACK_OF(ASN1_OBJECT) *policies;	/* Permissible policies */
+	} X509_VERIFY_PARAM;
+
+	static const ECDH_METHOD *default_ECDH_method = NULL;
+	
+#ifndef OPENSSL_NO_SSL_INTERN
+	struct ssl_ctx_st
+	{
+		const SSL_METHOD *method;
+		
+		STACK_OF(SSL_CIPHER) *cipher_list;
+		/* same as above but sorted for lookup */
+		STACK_OF(SSL_CIPHER) *cipher_list_by_id;
+		
+		struct x509_store_st /* X509_STORE */ *cert_store;
+		LHASH_OF(SSL_SESSION) *sessions;
+		/* Most session-ids that will be cached, default is
+		 * SSL_SESSION_CACHE_MAX_SIZE_DEFAULT. 0 is unlimited. */
+		unsigned long session_cache_size;
+		struct ssl_session_st *session_cache_head;
+		struct ssl_session_st *session_cache_tail;
+		
+		/* This can have one of 2 values, ored together,
+		 * SSL_SESS_CACHE_CLIENT,
+		 * SSL_SESS_CACHE_SERVER,
+		 * Default is SSL_SESSION_CACHE_SERVER, which means only
+		 * SSL_accept which cache SSL_SESSIONS. */
+		int session_cache_mode;
+		
+		/* If timeout is not 0, it is the default timeout value set
+		 * when SSL_new() is called.  This has been put in to make
+		 * life easier to set things up */
+		long session_timeout;
+		
+		/* If this callback is not null, it will be called each
+		 * time a session id is added to the cache.  If this function
+		 * returns 1, it means that the callback will do a
+		 * SSL_SESSION_free() when it has finished using it.  Otherwise,
+		 * on 0, it means the callback has finished with it.
+		 * If remove_session_cb is not null, it will be called when
+		 * a session-id is removed from the cache.  After the call,
+		 * OpenSSL will SSL_SESSION_free() it. */
+		
+		struct
+		{
+			int sess_connect;	/* SSL new conn - started */
+			int sess_connect_renegotiate;/* SSL reneg - requested */
+			int sess_connect_good;	/* SSL new conne/reneg - finished */
+			int sess_accept;	/* SSL new accept - started */
+			int sess_accept_renegotiate;/* SSL reneg - requested */
+			int sess_accept_good;	/* SSL accept/reneg - finished */
+			int sess_miss;		/* session lookup misses  */
+			int sess_timeout;	/* reuse attempt on timeouted session */
+			int sess_cache_full;	/* session removed due to full cache */
+			int sess_hit;		/* session reuse actually done */
+			int sess_cb_hit;	/* session-id that was not
+								 * in the cache was
+								 * passed back via the callback.  This
+								 * indicates that the application is
+								 * supplying session-id's from other
+								 * processes - spooky :-) */
+		} stats;
+		
+		int references;
+		
+		/* if defined, these override the X509_verify_cert() calls */
+		void *app_verify_arg;
+		/* before OpenSSL 0.9.7, 'app_verify_arg' was ignored
+		 * ('app_verify_callback' was called with just one argument) */
+		
+		/* Default password callback. */
+		pem_password_cb *default_passwd_callback;
+		
+		/* Default password callback user data. */
+		void *default_passwd_callback_userdata;
+		
+		/* get client cert callback */
+		
+		/* cookie generate callback */
+		
+		/* verify cookie callback */
+		
+		CRYPTO_EX_DATA ex_data;
+		
+		const EVP_MD *rsa_md5;/* For SSLv2 - name is 'ssl2-md5' */
+		const EVP_MD *md5;	/* For SSLv3/TLSv1 'ssl3-md5' */
+		const EVP_MD *sha1;   /* For SSLv3/TLSv1 'ssl3->sha1' */
+		
+		STACK_OF(X509) *extra_certs;
+		STACK_OF(SSL_COMP) *comp_methods; /* stack of SSL_COMP, SSLv3/TLSv1 */
+		
+		
+		/* Default values used when no per-SSL value is defined follow */
+		
+		
+		/* what we put in client cert requests */
+		STACK_OF(X509_NAME) *client_CA;
+		
+		
+		/* Default values to use in SSL structures follow (these are copied by SSL_new) */
+		
+		unsigned long options;
+		unsigned long mode;
+		long max_cert_list;
+		
+		struct cert_st /* CERT */ *cert;
+		int read_ahead;
+		
+		/* callback that allows applications to peek at protocol messages */
+		void *msg_callback_arg;
+		
+		int verify_mode;
+		unsigned int sid_ctx_length;
+		unsigned char sid_ctx[SSL_MAX_SID_CTX_LENGTH];
+		
+		/* Default generate session ID callback. */
+		// GEN_SESSION_CB generate_session_id; FixMe
+		
+		X509_VERIFY_PARAM *param;
+		
+#if 0
+		int purpose;		/* Purpose setting */
+		int trust;		/* Trust setting */
+#endif
+		
+		int quiet_shutdown;
+		
+		/* Maximum amount of data to send in one fragment.
+		 * actual record size can be more than this due to
+		 * padding and MAC overheads.
+		 */
+		unsigned int max_send_fragment;
+		
+#ifndef OPENSSL_ENGINE
+		/* Engine to pass requests for client certs to
+		 */
+		ENGINE *client_cert_engine;
+#endif
+		
+#ifndef OPENSSL_NO_TLSEXT
+		/* TLS extensions servername callback */
+		void *tlsext_servername_arg;
+		/* RFC 4507 session ticket keys */
+		unsigned char tlsext_tick_key_name[16];
+		unsigned char tlsext_tick_hmac_key[16];
+		unsigned char tlsext_tick_aes_key[16];
+		/* Callback to support customisation of ticket key setting */
+		
+		/* certificate status request info */
+		/* Callback for status request */
+		void *tlsext_status_arg;
+		
+		/* draft-rescorla-tls-opaque-prf-input-00.txt information */
+		void *tlsext_opaque_prf_input_callback_arg;
+#endif
+		
+#ifndef OPENSSL_NO_PSK
+		char *psk_identity_hint;
+#endif
+		
+#ifndef OPENSSL_NO_BUF_FREELISTS
+#define SSL_MAX_BUF_FREELIST_LEN_DEFAULT 32
+		unsigned int freelist_max_len;
+		struct ssl3_buf_freelist_st *wbuf_freelist;
+		struct ssl3_buf_freelist_st *rbuf_freelist;
+#endif
+#ifndef OPENSSL_NO_SRP
+		// SRP_CTX srp_ctx; /* ctx for SRP authentication */ FixMe
+#endif
+		
+#ifndef OPENSSL_NO_TLSEXT
+		
+# ifndef OPENSSL_NO_NEXTPROTONEG
+		/* Next protocol negotiation information */
+		/* (for experimental NPN extension). */
+		
+		/* For a server, this contains a callback function by which the set of
+		 * advertised protocols can be provided. */
+		void *next_protos_advertised_cb_arg;
+		/* For a client, this contains a callback function that selects the
+		 * next protocol from the list provided by the server. */
+		void *next_proto_select_cb_arg;
+# endif
+		/* SRTP profiles we are willing to do from RFC 5764 */
+		STACK_OF(SRTP_PROTECTION_PROFILE) *srtp_profiles;  
+#endif
+	};
+#endif
+	
+	typedef struct ssl_ctx_st SSL_CTX;
+	
+	static SSL_CTX *ctx=NULL;
+	
+	DECLARE_LHASH_OF(ENGINE_PILE);
+	
+	/* The type exposed in eng_int.h */
+	struct st_engine_table
+	{
+		LHASH_OF(ENGINE_PILE) piles;
+	}; /* ENGINE_TABLE */
+	
+	typedef struct st_engine_table ENGINE_TABLE;
+	
+	static ENGINE_TABLE *rand_table = NULL;
+	static ENGINE_TABLE *ecdh_table = NULL;
+	
+	struct x509_store_st
+	{
+		/* The following is a cache of trusted certs */
+		int cache; 	/* if true, stash any hits */
+		STACK_OF(X509_OBJECT) *objs;	/* Cache of all objects */
+		
+		/* These are external lookup methods */
+		STACK_OF(X509_LOOKUP) *get_cert_methods;
+		
+		X509_VERIFY_PARAM *param;
+		
+		/* Callbacks for various operations */
+		int (*verify)(X509_STORE_CTX *ctx);	/* called to verify a certificate */
+		int (*verify_cb)(int ok,X509_STORE_CTX *ctx);	/* error callback */
+		int (*get_issuer)(X509 **issuer, X509_STORE_CTX *ctx, X509 *x);	/* get issuers cert from ctx */
+		int (*check_issued)(X509_STORE_CTX *ctx, X509 *x, X509 *issuer); /* check issued */
+		int (*check_revocation)(X509_STORE_CTX *ctx); /* Check revocation status of chain */
+		int (*get_crl)(X509_STORE_CTX *ctx, X509_CRL **crl, X509 *x); /* retrieve CRL */
+		int (*check_crl)(X509_STORE_CTX *ctx, X509_CRL *crl); /* Check CRL validity */
+		int (*cert_crl)(X509_STORE_CTX *ctx, X509_CRL *crl, X509 *x); /* Check certificate against CRL */
+		STACK_OF(X509) * (*lookup_certs)(X509_STORE_CTX *ctx, X509_NAME *nm);
+		STACK_OF(X509_CRL) * (*lookup_crls)(X509_STORE_CTX *ctx, X509_NAME *nm);
+		int (*cleanup)(X509_STORE_CTX *ctx);
+		
+		CRYPTO_EX_DATA ex_data;
+		int references;
+	} /* X509_STORE */;
+	
+	struct x509_store_ctx_st      /* X509_STORE_CTX */
+	{
+		X509_STORE *ctx;
+		int current_method;	/* used when looking up certs */
+		
+		/* The following are set by the caller */
+		X509 *cert;		/* The cert to check */
+		STACK_OF(X509) *untrusted;	/* chain of X509s - untrusted - passed in */
+		STACK_OF(X509_CRL) *crls;	/* set of CRLs passed in */
+		
+		X509_VERIFY_PARAM *param;
+		void *other_ctx;	/* Other info for use with get_issuer() */
+		
+		/* Callbacks for various operations */
+		int (*verify)(X509_STORE_CTX *ctx);	/* called to verify a certificate */
+		int (*verify_cb)(int ok,X509_STORE_CTX *ctx);		/* error callback */
+		int (*get_issuer)(X509 **issuer, X509_STORE_CTX *ctx, X509 *x);	/* get issuers cert from ctx */
+		int (*check_issued)(X509_STORE_CTX *ctx, X509 *x, X509 *issuer); /* check issued */
+		int (*check_revocation)(X509_STORE_CTX *ctx); /* Check revocation status of chain */
+		int (*get_crl)(X509_STORE_CTX *ctx, X509_CRL **crl, X509 *x); /* retrieve CRL */
+		int (*check_crl)(X509_STORE_CTX *ctx, X509_CRL *crl); /* Check CRL validity */
+		int (*cert_crl)(X509_STORE_CTX *ctx, X509_CRL *crl, X509 *x); /* Check certificate against CRL */
+		int (*check_policy)(X509_STORE_CTX *ctx);
+		STACK_OF(X509) * (*lookup_certs)(X509_STORE_CTX *ctx, X509_NAME *nm);
+		STACK_OF(X509_CRL) * (*lookup_crls)(X509_STORE_CTX *ctx, X509_NAME *nm);
+		int (*cleanup)(X509_STORE_CTX *ctx);
+		
+		/* The following is built up */
+		int valid;		/* if 0, rebuild chain */
+		int last_untrusted;	/* index of last untrusted cert */
+		STACK_OF(X509) *chain; 		/* chain of X509s - built up and trusted */
+		X509_POLICY_TREE *tree;	/* Valid policy tree */
+		
+		int explicit_policy;	/* Require explicit policy value */
+		
+		/* When something goes wrong, this is why */
+		int error_depth;
+		int error;
+		X509 *current_cert;
+		X509 *current_issuer;	/* cert currently being tested as valid issuer */
+		X509_CRL *current_crl;	/* current CRL */
+		
+		int current_crl_score;  /* score of current CRL */
+		unsigned int current_reasons;  /* Reason mask */
+		
+		X509_STORE_CTX *parent; /* For CRL path validation: parent context */
+		
+		CRYPTO_EX_DATA ex_data;
+	} /* X509_STORE_CTX */;
+	
+	struct X509_POLICY_NODE_st
+	{
+		/* node data this refers to */
+		const X509_POLICY_DATA *data;
+		/* Parent node */
+		X509_POLICY_NODE *parent;
+		/* Number of child nodes */
+		int nchild;
+	};
+	
+	struct X509_POLICY_LEVEL_st
+	{
+		/* Cert for this level */
+		X509 *cert;
+		/* nodes at this level */
+		STACK_OF(X509_POLICY_NODE) *nodes;
+		/* anyPolicy node */
+		X509_POLICY_NODE *anyPolicy;
+		/* Extra data */
+		/*STACK_OF(X509_POLICY_DATA) *extra_data;*/
+		unsigned int flags;
+	};
+	
+	struct X509_POLICY_TREE_st
+	{
+		/* This is the tree 'level' data */
+		X509_POLICY_LEVEL *levels;
+		int nlevel;
+		/* Extra policy data when additional nodes (not from the certificate)
+		 * are required.
+		 */
+		STACK_OF(X509_POLICY_DATA) *extra_data;
+		/* This is the authority constained policy set */
+		STACK_OF(X509_POLICY_NODE) *auth_policies;
+		STACK_OF(X509_POLICY_NODE) *user_policies;
+		unsigned int flags;
+	};
+	
+	EVP_PKEY *pkey;
+	
+	typedef struct DSA_SIG_st
+	{
+		BIGNUM *r;
+		BIGNUM *s;
+	} DSA_SIG;
+	
+	struct dsa_st
+	{
+		/* This first variable is used to pick up errors where
+		 * a DSA is passed instead of of a EVP_PKEY */
+		int pad;
+		long version;
+		int write_params;
+		BIGNUM *p;
+		BIGNUM *q;	/* == 20 */
+		BIGNUM *g;
+		
+		BIGNUM *pub_key;  /* y public key */
+		BIGNUM *priv_key; /* x private key */
+		
+		BIGNUM *kinv;	/* Signing pre-calc */
+		BIGNUM *r;	/* Signing pre-calc */
+		
+		int flags;
+		/* Normally used to cache montgomery values */
+		BN_MONT_CTX *method_mont_p;
+		int references;
+		CRYPTO_EX_DATA ex_data;
+		const DSA_METHOD *meth;
+		/* functional reference if 'meth' is ENGINE-provided */
+		ENGINE *engine;
+	};
+	
+	typedef struct dsa_st DSA;
 
 	/********** Headers **********/ 
 	
@@ -3043,6 +3408,658 @@ asm ("dmultu	%2,%3"		\
 	
 	char *	BUF_strndup(const char *str, size_t siz);
 	char *	BUF_strdup(const char *str);
+	
+	/* file: EC_KEY_new_by_curve_name : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	EC_KEY *EC_KEY_new_by_curve_name(int nid);
+	
+	/* file: EC_KEY_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	EC_KEY *EC_KEY_new(void);
+	
+	/* file: CRYPTO_THREADID_current : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
+	void CRYPTO_THREADID_current(CRYPTO_THREADID *id);
+	
+	/* file: threadid_callback : /Volumes/work/Phd/ECDH/kv_openssl/cryptocryptlib.c */
+	static void (MS_FAR *threadid_callback)(CRYPTO_THREADID *)=0;
+	
+	/* file: id_callback : /Volumes/work/Phd/ECDH/kv_openssl/cryptocryptlib.c */
+#ifndef OPENSSL_NO_DEPRECATED
+	static unsigned long (MS_FAR *id_callback)(void)=0;
+#endif
+	
+	/* file: a2i_GENERAL_NAME : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3x509v3.h */
+	GENERAL_NAME *a2i_GENERAL_NAME(GENERAL_NAME *out,
+								   const X509V3_EXT_METHOD *method, X509V3_CTX *ctx,
+								   int gen_type, char *value, int is_nc);
+	
+	/* file: ERR_get_state : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+	ERR_STATE *ERR_get_state(void);
+	
+	/* file: ERR_STATE_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.c */
+	static void ERR_STATE_free(ERR_STATE *s);
+	
+	/* file: app_info_free : /Volumes/work/Phd/ECDH/kv_openssl/cryptomem_dbg.c */
+	static void app_info_free(APP_INFO *);
+	
+	/* file: free_func : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
+	int CRYPTO_set_locked_mem_functions(void *(*m)(size_t), void (*free_func)(void *));
+	
+	/* file: RAND_get_rand_method : /Volumes/work/Phd/ECDH/kv_openssl/crypto/randrand.h */
+	const RAND_METHOD *RAND_get_rand_method(void);
+	
+	/* file: ENGINE_get_default_RAND : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineengine.h */
+	ENGINE *ENGINE_get_default_RAND(void);
+	
+	/* file: engine_table_select : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_int.h */
+#ifndef ENGINE_TABLE_DEBUG
+	ENGINE *engine_table_select(ENGINE_TABLE **table, int nid);
+#else
+	/* file: engine_table_select_tmp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_int.h */
+#ifndef ENGINE_TABLE_DEBUG
+	ENGINE *engine_table_select_tmp(ENGINE_TABLE **table, int nid, const char *f, int l);
+#endif
+#endif
+	
+	/* file: BN_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BIGNUM *BN_new(void);
+	
+	/* file: LHASH_OF : /Volumes/work/Phd/ECDH/kv_openssl/appsopenssl.c */
+	static LHASH_OF(FUNCTION) *prog_init(void );
+	
+	/* file: engine_unlocked_init : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_int.h */
+	int engine_unlocked_init(ENGINE *e);
+	
+	/* file: init : /Volumes/work/Phd/ECDH/kv_openssl/crypto/evpevp.h */
+	int (*init)(EVP_PKEY_CTX *ctx);
+	
+	/* file: engine_unlocked_finish : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_int.h */
+	int engine_unlocked_finish(ENGINE *e, int unlock_for_handlers);
+	
+	/* file: engine_free_util : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_int.h */
+	int engine_free_util(ENGINE *e, int locked);
+	
+	/* file: engine_pkey_meths_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_int.h */
+	void engine_pkey_meths_free(ENGINE *e);
+	
+	/* file: EVP_PKEY_meth_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/evpevp.h */
+	void EVP_PKEY_meth_free(EVP_PKEY_METHOD *pmeth);
+	
+	/* file: engine_pkey_asn1_meths_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_int.h */
+	void engine_pkey_asn1_meths_free(ENGINE *e);
+	
+	/* file: EVP_PKEY_asn1_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/evpevp.h */
+	void EVP_PKEY_asn1_free(EVP_PKEY_ASN1_METHOD *ameth);
+	
+	/* file: CRYPTO_free_ex_data : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
+	void CRYPTO_free_ex_data(int class_index, void *obj, CRYPTO_EX_DATA *ad);
+	
+	/* file: ENGINE_get_RAND : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineengine.h */
+	const RAND_METHOD *ENGINE_get_RAND(const ENGINE *e);
+	
+	/* file: ENGINE_finish : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineengine.h */
+	int ENGINE_finish(ENGINE *e);
+	
+	/* file: RAND_SSLeay : /Volumes/work/Phd/ECDH/kv_openssl/crypto/randrand.h */
+	RAND_METHOD *RAND_SSLeay(void);
+	
+	/* file: BN_set_word : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_set_word(BIGNUM *a, BN_ULONG w);
+	
+	/* file: bn_expand2 : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BIGNUM *bn_expand2(BIGNUM *a, int words);
+	
+	/* file: BN_mul_word : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_mul_word(BIGNUM *a, BN_ULONG w);
+	
+	/* file: bn_mul_words : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BN_ULONG bn_mul_words(BN_ULONG *rp, const BN_ULONG *ap, int num, BN_ULONG w);
+	
+	/* file: BN_add_word : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_add_word(BIGNUM *a, BN_ULONG w);
+	
+	/* file: BN_sub_word : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_sub_word(BIGNUM *a, BN_ULONG w);
+	
+	/* file: BN_set_negative : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	void	BN_set_negative(BIGNUM *b, int n);
+	
+	/* file: BN_num_bits : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_num_bits(const BIGNUM *a);
+	
+	/* file: BN_num_bits_word : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_num_bits_word(BN_ULONG);
+	
+	/* file: BN_div_word : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BN_ULONG BN_div_word(BIGNUM *a, BN_ULONG w);
+	
+	/* file: BN_lshift : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_lshift(BIGNUM *r, const BIGNUM *a, int n);
+	
+	/* file: bn_div_words : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BN_ULONG bn_div_words(BN_ULONG h, BN_ULONG l, BN_ULONG d);
+	
+	/* file: BN_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	void	BN_free(BIGNUM *a);
+	
+	/* file: ASN1_OBJECT_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	void		ASN1_OBJECT_free(ASN1_OBJECT *a);
+	
+	/* file: ERR_add_error_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+	void ERR_add_error_data(int num, ...);
+	
+	/* file: ERR_add_error_vdata : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+	void ERR_add_error_vdata(int num, va_list args); 
+	
+	/* file: realloc_func : /Volumes/work/Phd/ECDH/kv_openssl/cryptomem.c */
+	static void *(*realloc_func)(void *, size_t)= realloc;
+	
+	/* file: a2i_IPADDRESS_NC : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3x509v3.h */
+	ASN1_OCTET_STRING *a2i_IPADDRESS_NC(const char *ipasc);
+	
+	/* file: ASN1_OCTET_STRING_set : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	int 	ASN1_OCTET_STRING_set(ASN1_OCTET_STRING *str, const unsigned char *data, int len);
+	
+	/* file: a2i_IPADDRESS : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3x509v3.h */
+	ASN1_OCTET_STRING *a2i_IPADDRESS(const char *ipasc);
+	
+	/* file: do_dirname : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3v3_alt.c */
+	static int do_dirname(GENERAL_NAME *gen, char *value, X509V3_CTX *ctx);
+	
+	/* file: X509V3_NAME_from_section : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3x509v3.h */
+	int X509V3_NAME_from_section(X509_NAME *nm, STACK_OF(CONF_VALUE)*dn_sk,
+								 unsigned long chtype);
+	
+	/* file: X509_NAME_add_entry_by_txt : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509x509.h */
+	int X509_NAME_add_entry_by_txt(X509_NAME *name, const char *field, int type,
+								   const unsigned char *bytes, int len, int loc, int set);
+								   
+	/* file: X509_NAME_ENTRY_create_by_txt : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509x509.h */
+	X509_NAME_ENTRY *X509_NAME_ENTRY_create_by_txt(X509_NAME_ENTRY **ne,
+												   const char *field, int type, const unsigned char *bytes, int len);
+	
+	
+	/* file: X509_NAME_ENTRY_create_by_OBJ : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509x509.h */
+	X509_NAME_ENTRY *X509_NAME_ENTRY_create_by_OBJ(X509_NAME_ENTRY **ne,
+												   ASN1_OBJECT *obj, int type,const unsigned char *bytes,
+												   int len);
+	
+	/* file: X509_NAME_ENTRY_set_object : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509x509.h */
+	int 		X509_NAME_ENTRY_set_object(X509_NAME_ENTRY *ne,
+										   ASN1_OBJECT *obj);
+	
+	/* file: X509_NAME_ENTRY_set_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509x509.h */
+	int 		X509_NAME_ENTRY_set_data(X509_NAME_ENTRY *ne, int type,
+										 const unsigned char *bytes, int len);
+	
+	/* file: ASN1_STRING_set_by_NID : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	ASN1_STRING *ASN1_STRING_set_by_NID(ASN1_STRING **out, 
+										const unsigned char *in, int inlen, int inform, int nid);
+	
+	/* file: ASN1_STRING_TABLE_get : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	ASN1_STRING_TABLE *ASN1_STRING_TABLE_get(int nid);
+	
+	/* file: sk_find : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stackstack.h */
+	int sk_find(_STACK *st, void *data);
+	
+	/* file: sk_sort : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stackstack.h */
+	void sk_sort(_STACK *st);
+	
+	/* file: ASN1_mbstring_ncopy : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	int ASN1_mbstring_ncopy(ASN1_STRING **out, const unsigned char *in, int len,
+							int inform, unsigned long mask, 
+							long minsize, long maxsize);
+	
+	/* file: ASN1_STRING_set : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	int 		ASN1_STRING_set(ASN1_STRING *str, const void *data, int len);
+	
+	/* file: ASN1_STRING_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	void		ASN1_STRING_free(ASN1_STRING *a);
+	
+	/* file: ASN1_mbstring_copy : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	int ASN1_mbstring_copy(ASN1_STRING **out, const unsigned char *in, int len,
+						   int inform, unsigned long mask);
+	
+	/* file: X509_NAME_add_entry : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509x509.h */
+	int 		X509_NAME_add_entry(X509_NAME *name,X509_NAME_ENTRY *ne,
+									int loc, int set);
+	
+	/* file: X509_NAME_ENTRY_dup : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509x509.h */
+	X509_NAME_ENTRY *X509_NAME_ENTRY_dup(X509_NAME_ENTRY *ne);
+	
+	/* file: sk_insert : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stackstack.h */
+	int sk_insert(_STACK *sk, void *data, int where);
+	
+	/* file: X509V3_section_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3x509v3.h */
+	void X509V3_section_free( X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *section);
+	
+	/* file: do_othername : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3v3_alt.c */
+	static int do_othername(GENERAL_NAME *gen, char *value, X509V3_CTX *ctx);
+	
+	/* file: ASN1_generate_v3 : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	ASN1_TYPE *ASN1_generate_v3(char *str, X509V3_CTX *cnf);
+	
+	/* file: asn1_multi : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1_gen.c */
+	static ASN1_TYPE *asn1_multi(int utype, const char *section, X509V3_CTX *cnf);
+	
+	/* file: sk_push : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stackstack.h */
+	int sk_push(_STACK *st, void *data);
+	
+	/* file: asn1_str2type : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1_gen.c */
+	static ASN1_TYPE *asn1_str2type(const char *str, int format, int utype);
+	
+	/* file: X509V3_get_value_bool : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3x509v3.h */
+	int X509V3_get_value_bool(CONF_VALUE *value, int *asn1_bool);
+	
+	/* file: BN_hex2bn : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int 	BN_hex2bn(BIGNUM **a, const char *str);
+	
+	/* file: BN_dec2bn : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int 	BN_dec2bn(BIGNUM **a, const char *str);
+	
+	/* file: BN_to_ASN1_INTEGER : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	ASN1_INTEGER *BN_to_ASN1_INTEGER(const BIGNUM *bn, ASN1_INTEGER *ai);
+	
+	/* file: BN_bn2bin : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_bn2bin(const BIGNUM *a, unsigned char *to);
+	
+	/* file: ASN1_STRING_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1_lib.c */
+	ASN1_STRING *ASN1_STRING_new(void) 	{
+		return(ASN1_STRING_type_new(V_ASN1_OCTET_STRING)); 	}
+	
+	/* file: ASN1_TIME_check : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	int ASN1_TIME_check(ASN1_TIME *t);
+	
+	/* file: ASN1_GENERALIZEDTIME_check : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	int ASN1_GENERALIZEDTIME_check(ASN1_GENERALIZEDTIME *a);
+	
+	/* file: ASN1_UTCTIME_check : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
+	int ASN1_UTCTIME_check(ASN1_UTCTIME *a);	
+	
+	/* file: CRYPTO_get_dynlock_value : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
+	struct CRYPTO_dynlock_value *CRYPTO_get_dynlock_value(int i);
+	
+	/* file: EC_GROUP_new_by_curve_name : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	EC_GROUP *EC_GROUP_new_by_curve_name(int nid);
+	
+	/* file: BN_CTX_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BN_CTX *BN_CTX_new(void);
+	
+	/* file: BN_POOL_init : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
+	static void		BN_POOL_init(BN_POOL *);
+	
+	/* file: BN_STACK_init : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
+	static void		BN_STACK_init(BN_STACK *);
+	
+	/* file: BN_bin2bn : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BIGNUM *BN_bin2bn(const unsigned char *s,int len,BIGNUM *ret);
+	
+	/* file: EC_GROUP_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	EC_GROUP *EC_GROUP_new(const EC_METHOD *meth);
+	
+	/* file: BN_init : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	void	BN_init(BIGNUM *);
+	
+	/* file: EC_GROUP_new_curve_GFp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	EC_GROUP *EC_GROUP_new_curve_GFp(const BIGNUM *p, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx);
+	
+	/* file: EC_GFp_mont_method : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	const EC_METHOD *EC_GFp_mont_method(void);
+	
+	/* file: EC_GFp_nist_method : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	const EC_METHOD *EC_GFp_nist_method(void);
+	
+	/* file: EC_GROUP_set_curve_GFp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_GROUP_set_curve_GFp(EC_GROUP *group, const BIGNUM *p, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx);
+	
+	/* file: ERR_peek_last_error : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+	unsigned long ERR_peek_last_error(void);
+	
+	/* file: EC_GROUP_clear_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	void EC_GROUP_clear_free(EC_GROUP *group);
+	
+	/* file: EC_EX_DATA_clear_free_all_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_lcl.h */
+	void EC_EX_DATA_clear_free_all_data(EC_EXTRA_DATA **);
+	
+	/* file: clear_free_func : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	void *EC_KEY_get_key_method_data(EC_KEY *key, 
+									 void *(*dup_func)(void *), void (*free_func)(void *), void (*clear_free_func)(void *));
+	
+	void *EC_KEY_insert_key_method_data(EC_KEY *key, void *data,
+										void *(*dup_func)(void *), void (*free_func)(void *), void (*clear_free_func)(void *));
+	
+	
+	/* file: EC_POINT_clear_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	void EC_POINT_clear_free(EC_POINT *point);
+	
+	/* file: BN_clear_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	void	BN_clear_free(BIGNUM *a);
+	
+	/* file: ERR_clear_error : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+	void ERR_clear_error(void );
+	
+	/* file: EC_GROUP_new_curve_GF2m : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+#ifndef OPENSSL_NO_EC2M
+	EC_GROUP *EC_GROUP_new_curve_GF2m(const BIGNUM *p, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx);
+#endif
+	
+	/* file: EC_GF2m_simple_method : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+#ifndef OPENSSL_NO_EC2M
+	const EC_METHOD *EC_GF2m_simple_method(void);
+#endif
+	
+	/* file: EC_GROUP_set_curve_GF2m : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+#ifndef OPENSSL_NO_EC2M
+	int EC_GROUP_set_curve_GF2m(EC_GROUP *group, const BIGNUM *p, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx);
+#endif
+	
+	/* file: EC_POINT_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	EC_POINT *EC_POINT_new(const EC_GROUP *group);
+	
+	/* file: EC_POINT_set_affine_coordinates_GFp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_POINT_set_affine_coordinates_GFp(const EC_GROUP *group, EC_POINT *p,
+											const BIGNUM *x, const BIGNUM *y, BN_CTX *ctx);
+	
+	/* file: EC_GROUP_set_generator : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_GROUP_set_generator(EC_GROUP *group, const EC_POINT *generator, const BIGNUM *order, const BIGNUM *cofactor);
+	
+	/* file: EC_POINT_copy : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_POINT_copy(EC_POINT *dst, const EC_POINT *src);
+	
+	/* file: BN_copy : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BIGNUM *BN_copy(BIGNUM *a, const BIGNUM *b);
+	
+	/* file: EC_GROUP_set_seed : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	size_t EC_GROUP_set_seed(EC_GROUP *, const unsigned char *, size_t len);
+	
+	/* file: EC_GROUP_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	void EC_GROUP_free(EC_GROUP *group);
+	
+	/* file: EC_EX_DATA_free_all_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_lcl.h */
+	void EC_EX_DATA_free_all_data(EC_EXTRA_DATA **);
+	
+	/* file: EC_POINT_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	void EC_POINT_free(EC_POINT *point);
+	
+	/* file: BN_CTX_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	void	BN_CTX_free(BN_CTX *c);
+	
+	/* file: BN_STACK_finish : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
+	static void		BN_STACK_finish(BN_STACK *);
+	
+	/* file: BN_POOL_finish : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
+	static void		BN_POOL_finish(BN_POOL *);	
+	
+	/* file: EC_GROUP_set_curve_name : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	void EC_GROUP_set_curve_name(EC_GROUP *group, int nid);
+	
+	/* file: EC_KEY_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	void EC_KEY_free(EC_KEY *key);	
+	
+	
+	/* file: EC_KEY_generate_key : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_KEY_generate_key(EC_KEY *key);
+	
+	/* file: EC_GROUP_get_order : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_GROUP_get_order(const EC_GROUP *group, BIGNUM *order, BN_CTX *ctx);
+	
+	/* file: BN_rand_range : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_rand_range(BIGNUM *rnd, const BIGNUM *range);
+	
+	/* file: BN_is_bit_set : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_is_bit_set(const BIGNUM *a, int n);
+	
+	/* file: BN_cmp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_cmp(const BIGNUM *a, const BIGNUM *b);
+	
+	/* file: BN_sub : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_sub(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
+	
+	/* file: BN_uadd : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_uadd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
+	
+	/* file: bn_add_words : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BN_ULONG bn_add_words(BN_ULONG *rp, const BN_ULONG *ap, const BN_ULONG *bp,int num);
+	
+	/* file: BN_ucmp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_ucmp(const BIGNUM *a, const BIGNUM *b);
+	
+	/* file: BN_usub : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_usub(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
+	
+	/* file: bn_sub_words : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BN_ULONG bn_sub_words(BN_ULONG *rp, const BN_ULONG *ap, const BN_ULONG *bp,int num);
+	
+	
+	/* file: EC_POINT_mul : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_POINT_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *n, const EC_POINT *q, const BIGNUM *m, BN_CTX *ctx);
+	
+	/* file: EC_POINTs_mul : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_POINTs_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *n, size_t num, const EC_POINT *p[], const BIGNUM *m[], BN_CTX *ctx);
+	
+	/* file: ec_wNAF_mul : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_lcl.h */
+	int ec_wNAF_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *scalar,
+					size_t num, const EC_POINT *points[], const BIGNUM *scalars[], BN_CTX *);
+	
+	/* file: EC_POINT_set_to_infinity : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_POINT_set_to_infinity(const EC_GROUP *group, EC_POINT *point);
+	
+	/* file: EC_GROUP_get0_generator : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	const EC_POINT *EC_GROUP_get0_generator(const EC_GROUP *group);
+	
+	/* file: EC_EX_DATA_get_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_lcl.h */
+	void *EC_EX_DATA_get_data(const EC_EXTRA_DATA *,
+							  void *(*dup_func)(void *), void (*free_func)(void *), void (*clear_free_func)(void *));
+	
+	/* file: EC_POINT_cmp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_POINT_cmp(const EC_GROUP *group, const EC_POINT *a, const EC_POINT *b, BN_CTX *ctx);
+	
+	/* file: EC_POINT_dbl : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_POINT_dbl(const EC_GROUP *group, EC_POINT *r, const EC_POINT *a, BN_CTX *ctx);
+	
+	/* file: EC_POINT_add : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_POINT_add(const EC_GROUP *group, EC_POINT *r, const EC_POINT *a, const EC_POINT *b, BN_CTX *ctx);
+	
+	/* file: EC_POINTs_make_affine : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_POINTs_make_affine(const EC_GROUP *group, size_t num, EC_POINT *points[], BN_CTX *ctx);
+	
+	/* file: EC_POINT_invert : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_POINT_invert(const EC_GROUP *group, EC_POINT *a, BN_CTX *ctx);
+	
+	/* file: EC_GROUP_get_degree : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_GROUP_get_degree(const EC_GROUP *group);
+	
+	/* file: EC_KEY_get0_group : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	const EC_GROUP *EC_KEY_get0_group(const EC_KEY *key);
+	
+	/* file: ECDH_compute_key : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecdhecdh.h */
+	int ECDH_compute_key(void *out, size_t outlen, const EC_POINT *pub_key, EC_KEY *ecdh,
+						 void *(*KDF)(const void *in, size_t inlen, void *out, size_t *outlen));
+	
+	/* file: ecdh_check : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecdhech_locl.h */
+	ECDH_DATA *ecdh_check(EC_KEY *);
+	
+	/* file: EC_KEY_get_key_method_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	void *EC_KEY_get_key_method_data(EC_KEY *key, 
+									 void *(*dup_func)(void *), void (*free_func)(void *), void (*clear_free_func)(void *));
+	
+	/* file: ecdh_data_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecdhech_lib.c */
+	static void *ecdh_data_new(void);
+	
+	/* file: ECDH_get_default_method : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecdhecdh.h */
+	const ECDH_METHOD *ECDH_get_default_method(void);
+	
+	/* file: ECDH_OpenSSL : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecdhecdh.h */
+	const ECDH_METHOD *ECDH_OpenSSL(void);
+	
+	/* file: ENGINE_get_default_ECDH : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineengine.h */
+	ENGINE *ENGINE_get_default_ECDH(void);
+	
+	/* file: ENGINE_get_ECDH : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineengine.h */
+	const ECDH_METHOD *ENGINE_get_ECDH(const ENGINE *e);
+	
+	/* file: CRYPTO_new_ex_data : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
+	int CRYPTO_new_ex_data(int class_index, void *obj, CRYPTO_EX_DATA *ad);
+	
+	
+	/* file: EC_KEY_insert_key_method_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	void *EC_KEY_insert_key_method_data(EC_KEY *key, void *data,
+										void *(*dup_func)(void *), void (*free_func)(void *), void (*clear_free_func)(void *));
+	
+	/* file: EC_EX_DATA_set_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_lcl.h */
+	int EC_EX_DATA_set_data(EC_EXTRA_DATA **, void *data,
+							void *(*dup_func)(void *), void (*free_func)(void *), void (*clear_free_func)(void *));
+	
+	/* file: EC_KEY_get_flags : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	int EC_KEY_get_flags(const EC_KEY *key);
+	
+	/* file: compute_key : /Volumes/work/Phd/ECDH/kv_openssl/crypto/dhdh_key.c */
+	static int compute_key(unsigned char *key, const BIGNUM *pub_key, DH *dh);
+	
+	
+	/* file: BN_CTX_start : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	void	BN_CTX_start(BN_CTX *ctx);
+	
+	
+	/* file: BN_STACK_push : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
+	static int		BN_STACK_push(BN_STACK *, unsigned int);
+	
+	
+	/* file: BN_CTX_get : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BIGNUM *BN_CTX_get(BN_CTX *ctx);
+	
+	
+	/* file: BN_MONT_CTX_set_locked : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BN_MONT_CTX *BN_MONT_CTX_set_locked(BN_MONT_CTX **pmont, int lock,
+										const BIGNUM *mod, BN_CTX *ctx);
+	
+	/* file: BN_MONT_CTX_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BN_MONT_CTX *BN_MONT_CTX_new(void );
+	
+	/* file: BN_MONT_CTX_init : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	void BN_MONT_CTX_init(BN_MONT_CTX *ctx);
+	
+	/* file: BN_MONT_CTX_set : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int BN_MONT_CTX_set(BN_MONT_CTX *mont,const BIGNUM *mod,BN_CTX *ctx);
+	
+	/* file: BN_set_bit : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_set_bit(BIGNUM *a, int n);
+	
+	/* file: BN_mod_inverse : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BIGNUM *BN_mod_inverse(BIGNUM *ret,
+						   const BIGNUM *a, const BIGNUM *n,BN_CTX *ctx);
+	
+	/* file: BN_mod_inverse_no_branch : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_gcd.c */
+	static BIGNUM *BN_mod_inverse_no_branch(BIGNUM *in,
+											const BIGNUM *a, const BIGNUM *n, BN_CTX *ctx);
+	
+	
+	/* file: BN_nnmod : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx);
+	
+	/* file: BN_div : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_div(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m, const BIGNUM *d,
+			   BN_CTX *ctx);
+	
+	/* file: BN_lshift1 : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_lshift1(BIGNUM *r, const BIGNUM *a);
+	
+	/* file: BN_rshift1 : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_rshift1(BIGNUM *r, const BIGNUM *a);
+	
+	/* file: BN_CTX_end : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	void	BN_CTX_end(BN_CTX *ctx);
+	
+	/* file: BN_STACK_pop : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
+	static unsigned int	BN_STACK_pop(BN_STACK *);
+	
+	/* file: BN_POOL_release : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
+	static void		BN_POOL_release(BN_POOL *, unsigned int);
+	
+	/* file: BN_rshift : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_rshift(BIGNUM *r, const BIGNUM *a, int n);
+	
+	/* file: BN_add : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_add(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
+	
+	/* file: BN_mul : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int	BN_mul(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx);
+	
+	/* file: bn_mul_comba4 : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_lcl.h */
+	void bn_mul_comba4(BN_ULONG *r,BN_ULONG *a,BN_ULONG *b);
+	
+	/* file: bn_mul_add_words : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	BN_ULONG bn_mul_add_words(BN_ULONG *rp, const BN_ULONG *ap, int num, BN_ULONG w);
+	
+	/* file: bn_mul_comba8 : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_lcl.h */
+	void bn_mul_comba8(BN_ULONG *r,BN_ULONG *a,BN_ULONG *b);
+	
+	/* file: bn_mul_part_recursive : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_lcl.h */
+	void bn_mul_part_recursive(BN_ULONG *r,BN_ULONG *a,BN_ULONG *b,
+							   int n,int tna,int tnb,BN_ULONG *t);
+	
+	/* file: bn_mul_normal : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_lcl.h */
+	void bn_mul_normal(BN_ULONG *r,BN_ULONG *a,int na,BN_ULONG *b,int nb);
+	
+	/* file: bn_cmp_part_words : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_lcl.h */
+	int bn_cmp_part_words(const BN_ULONG *a, const BN_ULONG *b,
+						  int cl, int dl);
+	
+	/* file: bn_cmp_words : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_lcl.h */
+	int bn_cmp_words(const BN_ULONG *a,const BN_ULONG *b,int n);
+	
+	/* file: bn_sub_part_words : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_lcl.h */
+	BN_ULONG bn_sub_part_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b,
+							   int cl, int dl);
+	
+	/* file: bn_mul_recursive : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_lcl.h */
+	void bn_mul_recursive(BN_ULONG *r,BN_ULONG *a,BN_ULONG *b,int n2,
+						  int dna,int dnb,BN_ULONG *t);
+	
+	/* file: BN_MONT_CTX_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	void BN_MONT_CTX_free(BN_MONT_CTX *mont);
+	
+	/* file: DH_check_pub_key : /Volumes/work/Phd/ECDH/kv_openssl/crypto/dhdh.h */
+	int	DH_check_pub_key(const DH *dh,const BIGNUM *pub_key, int *codes);
+	
+	/* file: bn_mod_exp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+	int (*bn_mod_exp)(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, const BIGNUM *m, BN_CTX *ctx, BN_MONT_CTX *m_ctx);
+	
+	/* file: EC_KEY_get0_public_key : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec.h */
+	const EC_POINT *EC_KEY_get0_public_key(const EC_KEY *key);
+	
+	/* DSA stuff */
+	static	DSA_SIG * surewarehk_dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa);
+	
+	int STORE_method_set_initialise_function(STORE_METHOD *sm, STORE_INITIALISE_FUNC_PTR init_f);
+	int STORE_method_set_cleanup_function( STORE_METHOD *sm, STORE_CLEANUP_FUNC_PTR clean_f);
+	int STORE_method_set_generate_function( STORE_METHOD *sm, STORE_GENERATE_OBJECT_FUNC_PTR generate_f);
+	int STORE_method_set_get_function(STORE_METHOD *sm, STORE_GET_OBJECT_FUNC_PTR get_f);
+	int STORE_method_set_store_function( STORE_METHOD *sm, STORE_STORE_OBJECT_FUNC_PTR store_f);
+	int STORE_method_set_modify_function( STORE_METHOD *sm, STORE_MODIFY_OBJECT_FUNC_PTR store_f);
+	int STORE_method_set_revoke_function( STORE_METHOD *sm, STORE_HANDLE_OBJECT_FUNC_PTR revoke_f);
+	int STORE_method_set_delete_function( STORE_METHOD *sm, STORE_HANDLE_OBJECT_FUNC_PTR delete_f);
+	int STORE_method_set_list_start_function( STORE_METHOD *sm, STORE_START_OBJECT_FUNC_PTR list_start_f);
+	int STORE_method_set_list_next_function( STORE_METHOD *sm, STORE_NEXT_OBJECT_FUNC_PTR list_next_f);
+	int STORE_method_set_list_end_function( STORE_METHOD *sm, STORE_END_OBJECT_FUNC_PTR list_end_f);
+	int STORE_method_set_update_store_function( STORE_METHOD *sm, STORE_GENERIC_FUNC_PTR);
+	int STORE_method_set_lock_store_function( STORE_METHOD *sm, STORE_GENERIC_FUNC_PTR);
+	int STORE_method_set_unlock_store_function( STORE_METHOD *sm, STORE_GENERIC_FUNC_PTR);
+	int STORE_method_set_ctrl_function( STORE_METHOD *sm, STORE_CTRL_FUNC_PTR ctrl_f);
+	
+	STORE_INITIALISE_FUNC_PTR STORE_method_get_initialise_function( STORE_METHOD *sm);
+	STORE_CLEANUP_FUNC_PTR STORE_method_get_cleanup_function( STORE_METHOD *sm);
+	STORE_GENERATE_OBJECT_FUNC_PTR STORE_method_get_generate_function( STORE_METHOD *sm);
+	STORE_GET_OBJECT_FUNC_PTR STORE_method_get_get_function( STORE_METHOD *sm);
+	STORE_STORE_OBJECT_FUNC_PTR STORE_method_get_store_function( STORE_METHOD *sm);
+	STORE_MODIFY_OBJECT_FUNC_PTR STORE_method_get_modify_function( STORE_METHOD *sm);
+	STORE_HANDLE_OBJECT_FUNC_PTR STORE_method_get_revoke_function( STORE_METHOD *sm);
+	STORE_HANDLE_OBJECT_FUNC_PTR STORE_method_get_delete_function( STORE_METHOD *sm);
+	STORE_START_OBJECT_FUNC_PTR STORE_method_get_list_start_function( STORE_METHOD *sm);
+	STORE_NEXT_OBJECT_FUNC_PTR STORE_method_get_list_next_function( STORE_METHOD *sm);
+	STORE_END_OBJECT_FUNC_PTR STORE_method_get_list_end_function( STORE_METHOD *sm);
+	STORE_GENERIC_FUNC_PTR STORE_method_get_update_store_function( STORE_METHOD *sm);
+	STORE_GENERIC_FUNC_PTR STORE_method_get_lock_store_function( STORE_METHOD *sm);
+	STORE_GENERIC_FUNC_PTR STORE_method_get_unlock_store_function( STORE_METHOD *sm);
+	STORE_CTRL_FUNC_PTR STORE_method_get_ctrl_function( STORE_METHOD *sm);
 	
 #ifdef __cplusplus
 }
