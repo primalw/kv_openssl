@@ -1,3 +1,5 @@
+#include "ecdh_low.h"
+
 /* file: EC_KEY_new_by_curve_name : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_key.c */
 EC_KEY *EC_KEY_new_by_curve_name(int nid)
 	{
@@ -5486,7 +5488,7 @@ const EC_METHOD *EC_GFp_mont_method(void)
 	static const EC_METHOD ret = {
 		EC_FLAGS_DEFAULT_OCT,
 		NID_X9_62_prime_field,
-		ec_GFp_mont_group_init,
+		/*ec_GFp_mont_group_init, FixMe
 		ec_GFp_mont_group_finish,
 		ec_GFp_mont_group_clear_finish,
 		ec_GFp_mont_group_copy,
@@ -5511,16 +5513,16 @@ const EC_METHOD *EC_GFp_mont_method(void)
 		ec_GFp_simple_is_on_curve,
 		ec_GFp_simple_cmp,
 		ec_GFp_simple_make_affine,
-		ec_GFp_simple_points_make_affine,
+		ec_GFp_simple_points_make_affine,*/
 		0 /* mul */,
 		0 /* precompute_mult */,
 		0 /* have_precompute_mult */,	
-		ec_GFp_mont_field_mul,
-		ec_GFp_mont_field_sqr,
+		/*ec_GFp_mont_field_mul,
+		ec_GFp_mont_field_sqr,*/
 		0 /* field_div */,
-		ec_GFp_mont_field_encode,
+		/*ec_GFp_mont_field_encode,
 		ec_GFp_mont_field_decode,
-		ec_GFp_mont_field_set_to_one };
+		ec_GFp_mont_field_set_to_one*/ };
 
 	return &ret;
 #endif
@@ -5722,7 +5724,7 @@ const EC_METHOD *EC_GF2m_simple_method(void)
 #else
 	static const EC_METHOD ret = {
 		EC_FLAGS_DEFAULT_OCT,
-		NID_X9_62_characteristic_two_field,
+		/*NID_X9_62_characteristic_two_field, FixMe
 		ec_GF2m_simple_group_init,
 		ec_GF2m_simple_group_finish,
 		ec_GF2m_simple_group_clear_finish,
@@ -5735,10 +5737,10 @@ const EC_METHOD *EC_GF2m_simple_method(void)
 		ec_GF2m_simple_point_finish,
 		ec_GF2m_simple_point_clear_finish,
 		ec_GF2m_simple_point_copy,
-		ec_GF2m_simple_point_set_to_infinity,
+		ec_GF2m_simple_point_set_to_infinity,*/
 		0 /* set_Jprojective_coordinates_GFp */,
 		0 /* get_Jprojective_coordinates_GFp */,
-		ec_GF2m_simple_point_set_affine_coordinates,
+		/*ec_GF2m_simple_point_set_affine_coordinates,
 		ec_GF2m_simple_point_get_affine_coordinates,
 		0,0,0,
 		ec_GF2m_simple_add,
@@ -5748,16 +5750,16 @@ const EC_METHOD *EC_GF2m_simple_method(void)
 		ec_GF2m_simple_is_on_curve,
 		ec_GF2m_simple_cmp,
 		ec_GF2m_simple_make_affine,
-		ec_GF2m_simple_points_make_affine,
+		ec_GF2m_simple_points_make_affine,*/
 
 		/* the following three method functions are defined in ec2_mult.c */
-		ec_GF2m_simple_mul,
+		/*ec_GF2m_simple_mul,
 		ec_GF2m_precompute_mult,
 		ec_GF2m_have_precompute_mult,
 
 		ec_GF2m_simple_field_mul,
 		ec_GF2m_simple_field_sqr,
-		ec_GF2m_simple_field_div,
+		ec_GF2m_simple_field_div,*/
 		0 /* field_encode */,
 		0 /* field_decode */,
 		0 /* field_set_to_one */ };
