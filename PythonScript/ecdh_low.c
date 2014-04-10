@@ -10762,3 +10762,17 @@ static int int_table_check(ENGINE_TABLE **t, int create) 	{
 	if(*t) return 1;  if(!create) return 0;  if((lh = lh_ENGINE_PILE_new()) == NULL) 		return 0;
 	*t = (ENGINE_TABLE *)lh; 	return 1;
 }
+
+/* file: default_realloc_ex : /Volumes/work/Phd/ECDH/kv_openssl/cryptomem.c */
+static void *default_realloc_ex(void *str, size_t num, const char *file, int line)
+{ return realloc_func(str,num); }
+
+/* file: drbg_get_adin : /Volumes/work/Phd/ECDH/kv_openssl/crypto/randrand_lib.c */
+#ifdef OPENSSL_FIPS
+static size_t drbg_get_adin(DRBG_CTX *ctx, unsigned char **pout)     	{
+	/* Use of static variables is OK as this happens under a lock */
+	static unsigned char buf[16];
+	static unsigned long counter;
+	FIPS_get_timevec(buf, &counter); 	*pout = buf;
+	return sizeof(buf); 	}
+#endif
