@@ -1814,8 +1814,10 @@ int ASN1_object_size(int constructed, int length, int tag)
 void ASN1_put_object(unsigned char **pp, int constructed, int length, int tag,
 	     int xclass)
 	{
+	
 	unsigned char *p= *pp;
-	int i, ttag;
+	int i, t
+	tag;
 
 	i=(constructed)?V_ASN1_CONSTRUCTED:0;
 	i|=(xclass&V_ASN1_PRIVATE);
@@ -2731,7 +2733,7 @@ int ASN1_mbstring_ncopy(ASN1_STRING **out, const unsigned char *in, int len,
 	traverse_string(in, len, inform, cpyfunc, &p);
 	return str_type;	
 }
-/* file: traverse_string : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c */
+/* file: traverse_string : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c FixMe
 static int traverse_string(const unsigned char *p, int len, int inform,
 		 int (*rfunc)(unsigned long value, void *in), void *arg);
 static int in_utf8(unsigned long value, void *arg);
@@ -2741,7 +2743,7 @@ static int cpy_asc(unsigned long value, void *arg);
 static int cpy_bmp(unsigned long value, void *arg);
 static int cpy_univ(unsigned long value, void *arg);
 static int cpy_utf8(unsigned long value, void *arg);
-static int is_printable(unsigned long value);
+static int is_printable(unsigned long value); */
 
 /* These functions take a string in UTF8, ASCII or multibyte form and
  * a mask of permissible ASN1 string types. It then works out the minimal
@@ -3083,7 +3085,7 @@ _dopr(
     *retlen = currlen - 1;
     return;
 }
-/* file: fmtint : /Volumes/work/Phd/ECDH/kv_openssl/crypto/biob_print.c */
+/* file: fmtint : /Volumes/work/Phd/ECDH/kv_openssl/crypto/biob_print.c FixMe
 static void fmtint     (char **, char **, size_t *, size_t *,
 			LLONG, int, int, int, int);
 static void fmtfp      (char **, char **, size_t *, size_t *,
@@ -3091,7 +3093,7 @@ static void fmtfp      (char **, char **, size_t *, size_t *,
 static void doapr_outch (char **, char **, size_t *, size_t *, int);
 static void _dopr(char **sbuffer, char **buffer,
 		  size_t *maxlen, size_t *retlen, int *truncated,
-		  const char *format, va_list args);
+		  const char *format, va_list args); */
 
 /* format read states */
 #define DP_S_DEFAULT    0
@@ -3385,13 +3387,13 @@ _dopr(
     *retlen = currlen - 1;
     return;
 }
-/* file: fmtfp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/biob_print.c */
+/* file: fmtfp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/biob_print.c FixMe
 static void fmtfp      (char **, char **, size_t *, size_t *,
 			LDOUBLE, int, int, int);
 static void doapr_outch (char **, char **, size_t *, size_t *, int);
 static void _dopr(char **sbuffer, char **buffer,
 		  size_t *maxlen, size_t *retlen, int *truncated,
-		  const char *format, va_list args);
+		  const char *format, va_list args); */
 
 /* format read states */
 #define DP_S_DEFAULT    0
@@ -3685,7 +3687,7 @@ _dopr(
     *retlen = currlen - 1;
     return;
 }
-/* file: fmtstr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/biob_print.c */
+/* file: fmtstr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/biob_print.c FixMe
 static void fmtstr     (char **, char **, size_t *, size_t *,
 			const char *, int, int, int);
 static void fmtint     (char **, char **, size_t *, size_t *,
@@ -3695,7 +3697,7 @@ static void fmtfp      (char **, char **, size_t *, size_t *,
 static void doapr_outch (char **, char **, size_t *, size_t *, int);
 static void _dopr(char **sbuffer, char **buffer,
 		  size_t *maxlen, size_t *retlen, int *truncated,
-		  const char *format, va_list args);
+		  const char *format, va_list args); */
 
 /* format read states */
 #define DP_S_DEFAULT    0
@@ -5208,9 +5210,6 @@ int OPENSSL_isservice(void)
 /* file: OPENSSL_isservice : /Volumes/work/Phd/ECDH/kv_openssl/cryptocryptlib.c */
 int OPENSSL_isservice(void) { return 0; }
 #endif
-#else
-/* file: OPENSSL_isservice : /Volumes/work/Phd/ECDH/kv_openssl/cryptocryptlib.c */
-int OPENSSL_isservice (void) { return 0; }
 #endif
 /* file: CRYPTO_destroy_dynlockid : /Volumes/work/Phd/ECDH/kv_openssl/cryptocryptlib.c */
 void CRYPTO_destroy_dynlockid(int i)
@@ -10077,7 +10076,6 @@ static unsigned int _strlen31(const char *str) 	{
 }
 #    endif
 #  endif
-#else /* The non-microsoft world */
 #  endif
 
 /* file: ecdh_low : /Volumes/work/Phd/ECDH/kv_openssl/PythonScriptecdh_low.h */
@@ -10631,105 +10629,11 @@ kssl_TKT2tkt(	/* IN     */	krb5_context	krb5context,
 	kssl_err->reason = SSL_R_KRB5_S_RD_REQ;
 	return ENOMEM;		/*  or  KRB5KRB_ERR_GENERIC;	*/
 }
-return 0;
 
 /* FIXME */
-krb5_ccache CC,
-krb5_creds  * pCR,
-krb5_creds  ** ppCR)
-{
-	if (!krb5_loaded)
-		load_krb5_dll();
-		
-		if ( p_krb5_get_credentials )
-			return(p_krb5_get_credentials(CO,F,CC,pCR,ppCR));
-		else
-			return KRB5KRB_ERR_GENERIC;
-}
-krb5_const char * sz,
-krb5_keytab * kt)
-{
-	if (!krb5_loaded)
-		load_krb5_dll();
-		
-		if ( p_krb5_kt_resolve )
-			return(p_krb5_kt_resolve(con,sz,kt));
-		else
-			return KRB5KRB_ERR_GENERIC;
-}
-krb5_keytab * kt)
-{
-	if (!krb5_loaded)
-		load_krb5_dll();
-		
-		if ( p_krb5_kt_default )
-			return(p_krb5_kt_default(con,kt));
-		else
-			return KRB5KRB_ERR_GENERIC;
-}
-krb5_ticket * kt)
-{
-	if (!krb5_loaded)
-		load_krb5_dll();
-		
-		if ( p_krb5_free_ticket )
-			return(p_krb5_free_ticket(con,kt));
-		else
-			return KRB5KRB_ERR_GENERIC;
-}
 
 #ifndef OPENSSL_NO_KRB5
 #if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_WIN32)
-
-krb5_const krb5_flags F,
-krb5_data  * pD1,
-krb5_creds  * pC,
-krb5_data  * pD2)
-{
-	if (!krb5_loaded)
-		load_krb5_dll();
-		
-		if ( p_krb5_mk_req_extended )
-			return(p_krb5_mk_req_extended(CO,pACO,F,pD1,pC,pD2));
-		else
-			return KRB5KRB_ERR_GENERIC;
-}
-krb5_auth_context  * pACO)
-{
-	if (!krb5_loaded)
-		load_krb5_dll();
-		
-		if ( p_krb5_auth_con_init )
-			return(p_krb5_auth_con_init(CO,pACO));
-		else
-			return KRB5KRB_ERR_GENERIC;
-}
-krb5_const krb5_flags F,
-krb5_ccache CC,
-krb5_creds  * pCR,
-krb5_creds  ** ppCR)
-{
-	if (!krb5_loaded)
-		load_krb5_dll();
-		
-		if ( p_krb5_get_credentials )
-			return(p_krb5_get_credentials(CO,F,CC,pCR,ppCR));
-		else
-			return KRB5KRB_ERR_GENERIC;
-}
-krb5_const char  * pC1,
-krb5_const char  * pC2,
-krb5_int32 I,
-krb5_principal  * pPR)
-{
-	if (!krb5_loaded)
-		load_krb5_dll();
-		
-		if ( p_krb5_sname_to_principal )
-			return(p_krb5_sname_to_principal(CO,pC1,pC2,I,pPR));
-		else
-			return KRB5KRB_ERR_GENERIC;
-}
 #ifndef NO_DEF_KRB5_CCACHE
 typedef	krb5_pointer	krb5_cc_cursor;	/* cursor for sequential lookup */
 #endif /* NO_DEF_KRB5_CCACHE */
