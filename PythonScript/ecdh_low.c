@@ -1,5 +1,18 @@
 #include "ecdh_low.h"
 
+/* file: err_fns_check : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.c */
+static void err_fns_check(void) 	{
+	/*if (err_fns) return; 	
+	 CRYPTO_w_lock(CRYPTO_LOCK_ERR);  if (!err_fns) 		err_fns = &err_defaults;
+	 CRYPTO_w_unlock(CRYPTO_LOCK_ERR); */
+}
+
+static IMPLEMENT_LHASH_COMP_FN(mem, MEM)
+static IMPLEMENT_LHASH_HASH_FN(mem, MEM)
+
+static IMPLEMENT_LHASH_COMP_FN(app_info, APP_INFO)
+static IMPLEMENT_LHASH_HASH_FN(app_info, APP_INFO)
+
 /* file: EC_KEY_new_by_curve_name : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_key.c */
 EC_KEY *EC_KEY_new_by_curve_name(int nid)
 	{
@@ -345,7 +358,7 @@ static STACK_OF(GENERAL_NAMES) *make_names_stack(STACK_OF(OPENSSL_STRING) *ns)
 
 	err:
 	if (ret)
-		sk_GENERAL_NAMES_pop_free(ret, GENERAL_NAMES_free);
+		// sk_GENERAL_NAMES_pop_free(ret, GENERAL_NAMES_free); FixMe
 	if (gens)
 		GENERAL_NAMES_free(gens);
 	if (gen)
@@ -1033,25 +1046,7 @@ int ERR_set_mark(void)
 	es->err_flags[es->top]|=ERR_FLAG_MARK;
 	return 1;
 	}
-/* file: LHASH_OF : /Volumes/work/Phd/ECDH/kv_openssl/appsopenssl.c */
-static LHASH_OF(FUNCTION) *prog_init(void)
-	{
-	LHASH_OF(FUNCTION) *ret;
-	FUNCTION *f;
-	size_t i;
 
-	/* Purely so it looks nice when the user hits ? */
-	for(i=0,f=functions ; f->name != NULL ; ++f,++i)
-	    ;
-	qsort(functions,i,sizeof *functions,SortFnByName);
-
-	if ((ret=lh_FUNCTION_new()) == NULL)
-		return(NULL);
-
-	for (f=functions; f->name != NULL; f++)
-		(void)lh_FUNCTION_insert(ret,f);
-	return(ret);
-	}
 /* file: engine_unlocked_init : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_init.c */
 int engine_unlocked_init(ENGINE *e)
 	{
@@ -1067,8 +1062,8 @@ int engine_unlocked_init(ENGINE *e)
 		 * structural reference. */
 		e->struct_ref++;
 		e->funct_ref++;
-		engine_ref_debug(e, 0, 1)
-		engine_ref_debug(e, 1, 1)
+		//engine_ref_debug(e, 0, 1)
+		//engine_ref_debug(e, 1, 1)
 		}
 	return to_return;
 	}
@@ -1125,7 +1120,7 @@ int engine_free_util(ENGINE *e, int locked)
 		i = CRYPTO_add(&e->struct_ref,-1,CRYPTO_LOCK_ENGINE);
 	else
 		i = --e->struct_ref;
-	engine_ref_debug(e, 0, -1)
+	//engine_ref_debug(e, 0, -1)
 	if (i > 0) return 1;
 #ifdef REF_CHECK
 	if (i < 0)
@@ -1250,7 +1245,7 @@ void EVP_PKEY_asn1_free(EVP_PKEY_ASN1_METHOD *ameth)
 void CRYPTO_free_ex_data(int class_index, void *obj, CRYPTO_EX_DATA *ad)
 	{
 	IMPL_CHECK
-	EX_IMPL(free_ex_data)(class_index, obj, ad);
+	sb_free_ex_data(class_index, obj, ad);
 	}
 /* file: ERR_pop_to_mark : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.c */
 int ERR_pop_to_mark(void)
@@ -1816,8 +1811,7 @@ void ASN1_put_object(unsigned char **pp, int constructed, int length, int tag,
 	{
 	
 	unsigned char *p= *pp;
-	int i, t
-	tag;
+	int i, t;
 
 	i=(constructed)?V_ASN1_CONSTRUCTED:0;
 	i|=(xclass&V_ASN1_PRIVATE);
@@ -2788,10 +2782,6 @@ int BIO_vsnprintf(char *buf, size_t n, const char *format, va_list args)
 	else
 		return (retlen <= INT_MAX) ? (int)retlen : -1;
 	}
-/* file: _dopr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/biob_print.c */
-static void _dopr(char **sbuffer, char **buffer,
-		  size_t *maxlen, size_t *retlen, int *truncated,
-		  const char *format, va_list args);
 
 /* format read states */
 #define DP_S_DEFAULT    0
@@ -3124,269 +3114,6 @@ static void _dopr(char **sbuffer, char **buffer,
 #define char_to_int(p) (p - '0')
 #define OSSL_MAX(p,q) ((p >= q) ? p : q)
 
-static void
-_dopr(
-    char **sbuffer,
-    char **buffer,
-    size_t *maxlen,
-    size_t *retlen,
-    int *truncated,
-    const char *format,
-    va_list args)
-{
-    char ch;
-    LLONG value;
-    LDOUBLE fvalue;
-    char *strvalue;
-    int min;
-    int max;
-    int state;
-    int flags;
-    int cflags;
-    size_t currlen;
-
-    state = DP_S_DEFAULT;
-    flags = currlen = cflags = min = 0;
-    max = -1;
-    ch = *format++;
-
-    while (state != DP_S_DONE) {
-        if (ch == '\0' || (buffer == NULL && currlen >= *maxlen))
-            state = DP_S_DONE;
-
-        switch (state) {
-        case DP_S_DEFAULT:
-            if (ch == '%')
-                state = DP_S_FLAGS;
-            else
-                doapr_outch(sbuffer,buffer, &currlen, maxlen, ch);
-            ch = *format++;
-            break;
-        case DP_S_FLAGS:
-            switch (ch) {
-            case '-':
-                flags |= DP_F_MINUS;
-                ch = *format++;
-                break;
-            case '+':
-                flags |= DP_F_PLUS;
-                ch = *format++;
-                break;
-            case ' ':
-                flags |= DP_F_SPACE;
-                ch = *format++;
-                break;
-            case '#':
-                flags |= DP_F_NUM;
-                ch = *format++;
-                break;
-            case '0':
-                flags |= DP_F_ZERO;
-                ch = *format++;
-                break;
-            default:
-                state = DP_S_MIN;
-                break;
-            }
-            break;
-        case DP_S_MIN:
-            if (isdigit((unsigned char)ch)) {
-                min = 10 * min + char_to_int(ch);
-                ch = *format++;
-            } else if (ch == '*') {
-                min = va_arg(args, int);
-                ch = *format++;
-                state = DP_S_DOT;
-            } else
-                state = DP_S_DOT;
-            break;
-        case DP_S_DOT:
-            if (ch == '.') {
-                state = DP_S_MAX;
-                ch = *format++;
-            } else
-                state = DP_S_MOD;
-            break;
-        case DP_S_MAX:
-            if (isdigit((unsigned char)ch)) {
-                if (max < 0)
-                    max = 0;
-                max = 10 * max + char_to_int(ch);
-                ch = *format++;
-            } else if (ch == '*') {
-                max = va_arg(args, int);
-                ch = *format++;
-                state = DP_S_MOD;
-            } else
-                state = DP_S_MOD;
-            break;
-        case DP_S_MOD:
-            switch (ch) {
-            case 'h':
-                cflags = DP_C_SHORT;
-                ch = *format++;
-                break;
-            case 'l':
-                if (*format == 'l') {
-                    cflags = DP_C_LLONG;
-                    format++;
-                } else
-                    cflags = DP_C_LONG;
-                ch = *format++;
-                break;
-            case 'q':
-                cflags = DP_C_LLONG;
-                ch = *format++;
-                break;
-            case 'L':
-                cflags = DP_C_LDOUBLE;
-                ch = *format++;
-                break;
-            default:
-                break;
-            }
-            state = DP_S_CONV;
-            break;
-        case DP_S_CONV:
-            switch (ch) {
-            case 'd':
-            case 'i':
-                switch (cflags) {
-                case DP_C_SHORT:
-                    value = (short int)va_arg(args, int);
-                    break;
-                case DP_C_LONG:
-                    value = va_arg(args, long int);
-                    break;
-                case DP_C_LLONG:
-                    value = va_arg(args, LLONG);
-                    break;
-                default:
-                    value = va_arg(args, int);
-                    break;
-                }
-                fmtint(sbuffer, buffer, &currlen, maxlen,
-                       value, 10, min, max, flags);
-                break;
-            case 'X':
-                flags |= DP_F_UP;
-                /* FALLTHROUGH */
-            case 'x':
-            case 'o':
-            case 'u':
-                flags |= DP_F_UNSIGNED;
-                switch (cflags) {
-                case DP_C_SHORT:
-                    value = (unsigned short int)va_arg(args, unsigned int);
-                    break;
-                case DP_C_LONG:
-                    value = (LLONG) va_arg(args,
-                        unsigned long int);
-                    break;
-                case DP_C_LLONG:
-                    value = va_arg(args, unsigned LLONG);
-                    break;
-                default:
-                    value = (LLONG) va_arg(args,
-                        unsigned int);
-                    break;
-                }
-                fmtint(sbuffer, buffer, &currlen, maxlen, value,
-                       ch == 'o' ? 8 : (ch == 'u' ? 10 : 16),
-                       min, max, flags);
-                break;
-            case 'f':
-                if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
-                else
-                    fvalue = va_arg(args, double);
-                fmtfp(sbuffer, buffer, &currlen, maxlen,
-                      fvalue, min, max, flags);
-                break;
-            case 'E':
-                flags |= DP_F_UP;
-            case 'e':
-                if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
-                else
-                    fvalue = va_arg(args, double);
-                break;
-            case 'G':
-                flags |= DP_F_UP;
-            case 'g':
-                if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
-                else
-                    fvalue = va_arg(args, double);
-                break;
-            case 'c':
-                doapr_outch(sbuffer, buffer, &currlen, maxlen,
-                    va_arg(args, int));
-                break;
-            case 's':
-                strvalue = va_arg(args, char *);
-                if (max < 0) {
-		    if (buffer)
-			max = INT_MAX;
-		    else
-			max = *maxlen;
-		}
-                fmtstr(sbuffer, buffer, &currlen, maxlen, strvalue,
-                       flags, min, max);
-                break;
-            case 'p':
-                value = (long)va_arg(args, void *);
-                fmtint(sbuffer, buffer, &currlen, maxlen,
-                    value, 16, min, max, flags|DP_F_NUM);
-                break;
-            case 'n': /* XXX */
-                if (cflags == DP_C_SHORT) {
-                    short int *num;
-                    num = va_arg(args, short int *);
-                    *num = currlen;
-                } else if (cflags == DP_C_LONG) { /* XXX */
-                    long int *num;
-                    num = va_arg(args, long int *);
-                    *num = (long int) currlen;
-                } else if (cflags == DP_C_LLONG) { /* XXX */
-                    LLONG *num;
-                    num = va_arg(args, LLONG *);
-                    *num = (LLONG) currlen;
-                } else {
-                    int    *num;
-                    num = va_arg(args, int *);
-                    *num = currlen;
-                }
-                break;
-            case '%':
-                doapr_outch(sbuffer, buffer, &currlen, maxlen, ch);
-                break;
-            case 'w':
-                /* not supported yet, treat as next char */
-                ch = *format++;
-                break;
-            default:
-                /* unknown, skip */
-                break;
-            }
-            ch = *format++;
-            state = DP_S_DEFAULT;
-            flags = cflags = min = 0;
-            max = -1;
-            break;
-        case DP_S_DONE:
-            break;
-        default:
-            break;
-        }
-    }
-    *truncated = (currlen > *maxlen - 1);
-    if (*truncated)
-        currlen = *maxlen - 1;
-    doapr_outch(sbuffer, buffer, &currlen, maxlen, '\0');
-    *retlen = currlen - 1;
-    return;
-}
 /* file: fmtfp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/biob_print.c FixMe
 static void fmtfp      (char **, char **, size_t *, size_t *,
 			LDOUBLE, int, int, int);
@@ -3424,281 +3151,6 @@ static void _dopr(char **sbuffer, char **buffer,
 #define char_to_int(p) (p - '0')
 #define OSSL_MAX(p,q) ((p >= q) ? p : q)
 
-static void
-_dopr(
-    char **sbuffer,
-    char **buffer,
-    size_t *maxlen,
-    size_t *retlen,
-    int *truncated,
-    const char *format,
-    va_list args)
-{
-    char ch;
-    LLONG value;
-    LDOUBLE fvalue;
-    char *strvalue;
-    int min;
-    int max;
-    int state;
-    int flags;
-    int cflags;
-    size_t currlen;
-
-    state = DP_S_DEFAULT;
-    flags = currlen = cflags = min = 0;
-    max = -1;
-    ch = *format++;
-
-    while (state != DP_S_DONE) {
-        if (ch == '\0' || (buffer == NULL && currlen >= *maxlen))
-            state = DP_S_DONE;
-
-        switch (state) {
-        case DP_S_DEFAULT:
-            if (ch == '%')
-                state = DP_S_FLAGS;
-            else
-                doapr_outch(sbuffer,buffer, &currlen, maxlen, ch);
-            ch = *format++;
-            break;
-        case DP_S_FLAGS:
-            switch (ch) {
-            case '-':
-                flags |= DP_F_MINUS;
-                ch = *format++;
-                break;
-            case '+':
-                flags |= DP_F_PLUS;
-                ch = *format++;
-                break;
-            case ' ':
-                flags |= DP_F_SPACE;
-                ch = *format++;
-                break;
-            case '#':
-                flags |= DP_F_NUM;
-                ch = *format++;
-                break;
-            case '0':
-                flags |= DP_F_ZERO;
-                ch = *format++;
-                break;
-            default:
-                state = DP_S_MIN;
-                break;
-            }
-            break;
-        case DP_S_MIN:
-            if (isdigit((unsigned char)ch)) {
-                min = 10 * min + char_to_int(ch);
-                ch = *format++;
-            } else if (ch == '*') {
-                min = va_arg(args, int);
-                ch = *format++;
-                state = DP_S_DOT;
-            } else
-                state = DP_S_DOT;
-            break;
-        case DP_S_DOT:
-            if (ch == '.') {
-                state = DP_S_MAX;
-                ch = *format++;
-            } else
-                state = DP_S_MOD;
-            break;
-        case DP_S_MAX:
-            if (isdigit((unsigned char)ch)) {
-                if (max < 0)
-                    max = 0;
-                max = 10 * max + char_to_int(ch);
-                ch = *format++;
-            } else if (ch == '*') {
-                max = va_arg(args, int);
-                ch = *format++;
-                state = DP_S_MOD;
-            } else
-                state = DP_S_MOD;
-            break;
-        case DP_S_MOD:
-            switch (ch) {
-            case 'h':
-                cflags = DP_C_SHORT;
-                ch = *format++;
-                break;
-            case 'l':
-                if (*format == 'l') {
-                    cflags = DP_C_LLONG;
-                    format++;
-                } else
-                    cflags = DP_C_LONG;
-                ch = *format++;
-                break;
-            case 'q':
-                cflags = DP_C_LLONG;
-                ch = *format++;
-                break;
-            case 'L':
-                cflags = DP_C_LDOUBLE;
-                ch = *format++;
-                break;
-            default:
-                break;
-            }
-            state = DP_S_CONV;
-            break;
-        case DP_S_CONV:
-            switch (ch) {
-            case 'd':
-            case 'i':
-                switch (cflags) {
-                case DP_C_SHORT:
-                    value = (short int)va_arg(args, int);
-                    break;
-                case DP_C_LONG:
-                    value = va_arg(args, long int);
-                    break;
-                case DP_C_LLONG:
-                    value = va_arg(args, LLONG);
-                    break;
-                default:
-                    value = va_arg(args, int);
-                    break;
-                }
-                fmtint(sbuffer, buffer, &currlen, maxlen,
-                       value, 10, min, max, flags);
-                break;
-            case 'X':
-                flags |= DP_F_UP;
-                /* FALLTHROUGH */
-            case 'x':
-            case 'o':
-            case 'u':
-                flags |= DP_F_UNSIGNED;
-                switch (cflags) {
-                case DP_C_SHORT:
-                    value = (unsigned short int)va_arg(args, unsigned int);
-                    break;
-                case DP_C_LONG:
-                    value = (LLONG) va_arg(args,
-                        unsigned long int);
-                    break;
-                case DP_C_LLONG:
-                    value = va_arg(args, unsigned LLONG);
-                    break;
-                default:
-                    value = (LLONG) va_arg(args,
-                        unsigned int);
-                    break;
-                }
-                fmtint(sbuffer, buffer, &currlen, maxlen, value,
-                       ch == 'o' ? 8 : (ch == 'u' ? 10 : 16),
-                       min, max, flags);
-                break;
-            case 'f':
-                if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
-                else
-                    fvalue = va_arg(args, double);
-                fmtfp(sbuffer, buffer, &currlen, maxlen,
-                      fvalue, min, max, flags);
-                break;
-            case 'E':
-                flags |= DP_F_UP;
-            case 'e':
-                if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
-                else
-                    fvalue = va_arg(args, double);
-                break;
-            case 'G':
-                flags |= DP_F_UP;
-            case 'g':
-                if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
-                else
-                    fvalue = va_arg(args, double);
-                break;
-            case 'c':
-                doapr_outch(sbuffer, buffer, &currlen, maxlen,
-                    va_arg(args, int));
-                break;
-            case 's':
-                strvalue = va_arg(args, char *);
-                if (max < 0) {
-		    if (buffer)
-			max = INT_MAX;
-		    else
-			max = *maxlen;
-		}
-                fmtstr(sbuffer, buffer, &currlen, maxlen, strvalue,
-                       flags, min, max);
-                break;
-            case 'p':
-                value = (long)va_arg(args, void *);
-                fmtint(sbuffer, buffer, &currlen, maxlen,
-                    value, 16, min, max, flags|DP_F_NUM);
-                break;
-            case 'n': /* XXX */
-                if (cflags == DP_C_SHORT) {
-                    short int *num;
-                    num = va_arg(args, short int *);
-                    *num = currlen;
-                } else if (cflags == DP_C_LONG) { /* XXX */
-                    long int *num;
-                    num = va_arg(args, long int *);
-                    *num = (long int) currlen;
-                } else if (cflags == DP_C_LLONG) { /* XXX */
-                    LLONG *num;
-                    num = va_arg(args, LLONG *);
-                    *num = (LLONG) currlen;
-                } else {
-                    int    *num;
-                    num = va_arg(args, int *);
-                    *num = currlen;
-                }
-                break;
-            case '%':
-                doapr_outch(sbuffer, buffer, &currlen, maxlen, ch);
-                break;
-            case 'w':
-                /* not supported yet, treat as next char */
-                ch = *format++;
-                break;
-            default:
-                /* unknown, skip */
-                break;
-            }
-            ch = *format++;
-            state = DP_S_DEFAULT;
-            flags = cflags = min = 0;
-            max = -1;
-            break;
-        case DP_S_DONE:
-            break;
-        default:
-            break;
-        }
-    }
-    *truncated = (currlen > *maxlen - 1);
-    if (*truncated)
-        currlen = *maxlen - 1;
-    doapr_outch(sbuffer, buffer, &currlen, maxlen, '\0');
-    *retlen = currlen - 1;
-    return;
-}
-/* file: fmtstr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/biob_print.c FixMe
-static void fmtstr     (char **, char **, size_t *, size_t *,
-			const char *, int, int, int);
-static void fmtint     (char **, char **, size_t *, size_t *,
-			LLONG, int, int, int, int);
-static void fmtfp      (char **, char **, size_t *, size_t *,
-			LDOUBLE, int, int, int);
-static void doapr_outch (char **, char **, size_t *, size_t *, int);
-static void _dopr(char **sbuffer, char **buffer,
-		  size_t *maxlen, size_t *retlen, int *truncated,
-		  const char *format, va_list args); */
-
 /* format read states */
 #define DP_S_DEFAULT    0
 #define DP_S_FLAGS      1
@@ -3728,269 +3180,6 @@ static void _dopr(char **sbuffer, char **buffer,
 #define char_to_int(p) (p - '0')
 #define OSSL_MAX(p,q) ((p >= q) ? p : q)
 
-static void
-_dopr(
-    char **sbuffer,
-    char **buffer,
-    size_t *maxlen,
-    size_t *retlen,
-    int *truncated,
-    const char *format,
-    va_list args)
-{
-    char ch;
-    LLONG value;
-    LDOUBLE fvalue;
-    char *strvalue;
-    int min;
-    int max;
-    int state;
-    int flags;
-    int cflags;
-    size_t currlen;
-
-    state = DP_S_DEFAULT;
-    flags = currlen = cflags = min = 0;
-    max = -1;
-    ch = *format++;
-
-    while (state != DP_S_DONE) {
-        if (ch == '\0' || (buffer == NULL && currlen >= *maxlen))
-            state = DP_S_DONE;
-
-        switch (state) {
-        case DP_S_DEFAULT:
-            if (ch == '%')
-                state = DP_S_FLAGS;
-            else
-                doapr_outch(sbuffer,buffer, &currlen, maxlen, ch);
-            ch = *format++;
-            break;
-        case DP_S_FLAGS:
-            switch (ch) {
-            case '-':
-                flags |= DP_F_MINUS;
-                ch = *format++;
-                break;
-            case '+':
-                flags |= DP_F_PLUS;
-                ch = *format++;
-                break;
-            case ' ':
-                flags |= DP_F_SPACE;
-                ch = *format++;
-                break;
-            case '#':
-                flags |= DP_F_NUM;
-                ch = *format++;
-                break;
-            case '0':
-                flags |= DP_F_ZERO;
-                ch = *format++;
-                break;
-            default:
-                state = DP_S_MIN;
-                break;
-            }
-            break;
-        case DP_S_MIN:
-            if (isdigit((unsigned char)ch)) {
-                min = 10 * min + char_to_int(ch);
-                ch = *format++;
-            } else if (ch == '*') {
-                min = va_arg(args, int);
-                ch = *format++;
-                state = DP_S_DOT;
-            } else
-                state = DP_S_DOT;
-            break;
-        case DP_S_DOT:
-            if (ch == '.') {
-                state = DP_S_MAX;
-                ch = *format++;
-            } else
-                state = DP_S_MOD;
-            break;
-        case DP_S_MAX:
-            if (isdigit((unsigned char)ch)) {
-                if (max < 0)
-                    max = 0;
-                max = 10 * max + char_to_int(ch);
-                ch = *format++;
-            } else if (ch == '*') {
-                max = va_arg(args, int);
-                ch = *format++;
-                state = DP_S_MOD;
-            } else
-                state = DP_S_MOD;
-            break;
-        case DP_S_MOD:
-            switch (ch) {
-            case 'h':
-                cflags = DP_C_SHORT;
-                ch = *format++;
-                break;
-            case 'l':
-                if (*format == 'l') {
-                    cflags = DP_C_LLONG;
-                    format++;
-                } else
-                    cflags = DP_C_LONG;
-                ch = *format++;
-                break;
-            case 'q':
-                cflags = DP_C_LLONG;
-                ch = *format++;
-                break;
-            case 'L':
-                cflags = DP_C_LDOUBLE;
-                ch = *format++;
-                break;
-            default:
-                break;
-            }
-            state = DP_S_CONV;
-            break;
-        case DP_S_CONV:
-            switch (ch) {
-            case 'd':
-            case 'i':
-                switch (cflags) {
-                case DP_C_SHORT:
-                    value = (short int)va_arg(args, int);
-                    break;
-                case DP_C_LONG:
-                    value = va_arg(args, long int);
-                    break;
-                case DP_C_LLONG:
-                    value = va_arg(args, LLONG);
-                    break;
-                default:
-                    value = va_arg(args, int);
-                    break;
-                }
-                fmtint(sbuffer, buffer, &currlen, maxlen,
-                       value, 10, min, max, flags);
-                break;
-            case 'X':
-                flags |= DP_F_UP;
-                /* FALLTHROUGH */
-            case 'x':
-            case 'o':
-            case 'u':
-                flags |= DP_F_UNSIGNED;
-                switch (cflags) {
-                case DP_C_SHORT:
-                    value = (unsigned short int)va_arg(args, unsigned int);
-                    break;
-                case DP_C_LONG:
-                    value = (LLONG) va_arg(args,
-                        unsigned long int);
-                    break;
-                case DP_C_LLONG:
-                    value = va_arg(args, unsigned LLONG);
-                    break;
-                default:
-                    value = (LLONG) va_arg(args,
-                        unsigned int);
-                    break;
-                }
-                fmtint(sbuffer, buffer, &currlen, maxlen, value,
-                       ch == 'o' ? 8 : (ch == 'u' ? 10 : 16),
-                       min, max, flags);
-                break;
-            case 'f':
-                if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
-                else
-                    fvalue = va_arg(args, double);
-                fmtfp(sbuffer, buffer, &currlen, maxlen,
-                      fvalue, min, max, flags);
-                break;
-            case 'E':
-                flags |= DP_F_UP;
-            case 'e':
-                if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
-                else
-                    fvalue = va_arg(args, double);
-                break;
-            case 'G':
-                flags |= DP_F_UP;
-            case 'g':
-                if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
-                else
-                    fvalue = va_arg(args, double);
-                break;
-            case 'c':
-                doapr_outch(sbuffer, buffer, &currlen, maxlen,
-                    va_arg(args, int));
-                break;
-            case 's':
-                strvalue = va_arg(args, char *);
-                if (max < 0) {
-		    if (buffer)
-			max = INT_MAX;
-		    else
-			max = *maxlen;
-		}
-                fmtstr(sbuffer, buffer, &currlen, maxlen, strvalue,
-                       flags, min, max);
-                break;
-            case 'p':
-                value = (long)va_arg(args, void *);
-                fmtint(sbuffer, buffer, &currlen, maxlen,
-                    value, 16, min, max, flags|DP_F_NUM);
-                break;
-            case 'n': /* XXX */
-                if (cflags == DP_C_SHORT) {
-                    short int *num;
-                    num = va_arg(args, short int *);
-                    *num = currlen;
-                } else if (cflags == DP_C_LONG) { /* XXX */
-                    long int *num;
-                    num = va_arg(args, long int *);
-                    *num = (long int) currlen;
-                } else if (cflags == DP_C_LLONG) { /* XXX */
-                    LLONG *num;
-                    num = va_arg(args, LLONG *);
-                    *num = (LLONG) currlen;
-                } else {
-                    int    *num;
-                    num = va_arg(args, int *);
-                    *num = currlen;
-                }
-                break;
-            case '%':
-                doapr_outch(sbuffer, buffer, &currlen, maxlen, ch);
-                break;
-            case 'w':
-                /* not supported yet, treat as next char */
-                ch = *format++;
-                break;
-            default:
-                /* unknown, skip */
-                break;
-            }
-            ch = *format++;
-            state = DP_S_DEFAULT;
-            flags = cflags = min = 0;
-            max = -1;
-            break;
-        case DP_S_DONE:
-            break;
-        default:
-            break;
-        }
-    }
-    *truncated = (currlen > *maxlen - 1);
-    if (*truncated)
-        currlen = *maxlen - 1;
-    doapr_outch(sbuffer, buffer, &currlen, maxlen, '\0');
-    *retlen = currlen - 1;
-    return;
-}
 /* file: ASN1_STRING_set : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1_lib.c */
 int ASN1_STRING_set(ASN1_STRING *str, const void *_data, int len)
 	{
@@ -4036,12 +3225,7 @@ void ASN1_STRING_free(ASN1_STRING *a)
 		OPENSSL_free(a->data);
 	OPENSSL_free(a);
 	}
-/* file: ASN1_mbstring_copy : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c */
-int ASN1_mbstring_copy(ASN1_STRING **out, const unsigned char *in, int len,
-					int inform, unsigned long mask)
-{
-	return ASN1_mbstring_ncopy(out, in, len, inform, mask, 0, 0);
-}
+
 /* file: OBJ_obj2nid : /Volumes/work/Phd/ECDH/kv_openssl/crypto/objectsobj_dat.c */
 int OBJ_obj2nid(const ASN1_OBJECT *a)
 	{
@@ -7269,7 +6453,7 @@ const ECDH_METHOD *ENGINE_get_ECDH(const ENGINE *e)
 int CRYPTO_new_ex_data(int class_index, void *obj, CRYPTO_EX_DATA *ad)
 	{
 	IMPL_CHECK
-	return EX_IMPL(new_ex_data)(class_index, obj, ad);
+	return cb_new_ex_data(class_index, obj, ad); /* FixMe */
 	}
 /* file: EC_KEY_insert_key_method_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_key.c */
 void *EC_KEY_insert_key_method_data(EC_KEY *key, void *data,
@@ -7943,299 +7127,6 @@ err:
 static BIGNUM *BN_mod_inverse_no_branch(BIGNUM *in,
         const BIGNUM *a, const BIGNUM *n, BN_CTX *ctx);
 
-BIGNUM *BN_mod_inverse(BIGNUM *in,
-	const BIGNUM *a, const BIGNUM *n, BN_CTX *ctx)
-	{
-	BIGNUM *A,*B,*X,*Y,*M,*D,*T,*R=NULL;
-	BIGNUM *ret=NULL;
-	int sign;
-
-	if ((BN_get_flags(a, BN_FLG_CONSTTIME) != 0) || (BN_get_flags(n, BN_FLG_CONSTTIME) != 0))
-		{
-		return BN_mod_inverse_no_branch(in, a, n, ctx);
-		}
-
-	bn_check_top(a);
-	bn_check_top(n);
-
-	BN_CTX_start(ctx);
-	A = BN_CTX_get(ctx);
-	B = BN_CTX_get(ctx);
-	X = BN_CTX_get(ctx);
-	D = BN_CTX_get(ctx);
-	M = BN_CTX_get(ctx);
-	Y = BN_CTX_get(ctx);
-	T = BN_CTX_get(ctx);
-	if (T == NULL) goto err;
-
-	if (in == NULL)
-		R=BN_new();
-	else
-		R=in;
-	if (R == NULL) goto err;
-
-	BN_one(X);
-	BN_zero(Y);
-	if (BN_copy(B,a) == NULL) goto err;
-	if (BN_copy(A,n) == NULL) goto err;
-	A->neg = 0;
-	if (B->neg || (BN_ucmp(B, A) >= 0))
-		{
-		if (!BN_nnmod(B, B, A, ctx)) goto err;
-		}
-	sign = -1;
-	/* From  B = a mod |n|,  A = |n|  it follows that
-	 *
-	 *      0 <= B < A,
-	 *     -sign*X*a  ==  B   (mod |n|),
-	 *      sign*Y*a  ==  A   (mod |n|).
-	 */
-
-	if (BN_is_odd(n) && (BN_num_bits(n) <= (BN_BITS <= 32 ? 450 : 2048)))
-		{
-		/* Binary inversion algorithm; requires odd modulus.
-		 * This is faster than the general algorithm if the modulus
-		 * is sufficiently small (about 400 .. 500 bits on 32-bit
-		 * sytems, but much more on 64-bit systems) */
-		int shift;
-		
-		while (!BN_is_zero(B))
-			{
-			/*
-			 *      0 < B < |n|,
-			 *      0 < A <= |n|,
-			 * (1) -sign*X*a  ==  B   (mod |n|),
-			 * (2)  sign*Y*a  ==  A   (mod |n|)
-			 */
-
-			/* Now divide  B  by the maximum possible power of two in the integers,
-			 * and divide  X  by the same value mod |n|.
-			 * When we're done, (1) still holds. */
-			shift = 0;
-			while (!BN_is_bit_set(B, shift)) /* note that 0 < B */
-				{
-				shift++;
-				
-				if (BN_is_odd(X))
-					{
-					if (!BN_uadd(X, X, n)) goto err;
-					}
-				/* now X is even, so we can easily divide it by two */
-				if (!BN_rshift1(X, X)) goto err;
-				}
-			if (shift > 0)
-				{
-				if (!BN_rshift(B, B, shift)) goto err;
-				}
-
-
-			/* Same for  A  and  Y.  Afterwards, (2) still holds. */
-			shift = 0;
-			while (!BN_is_bit_set(A, shift)) /* note that 0 < A */
-				{
-				shift++;
-				
-				if (BN_is_odd(Y))
-					{
-					if (!BN_uadd(Y, Y, n)) goto err;
-					}
-				/* now Y is even */
-				if (!BN_rshift1(Y, Y)) goto err;
-				}
-			if (shift > 0)
-				{
-				if (!BN_rshift(A, A, shift)) goto err;
-				}
-
-			
-			/* We still have (1) and (2).
-			 * Both  A  and  B  are odd.
-			 * The following computations ensure that
-			 *
-			 *     0 <= B < |n|,
-			 *      0 < A < |n|,
-			 * (1) -sign*X*a  ==  B   (mod |n|),
-			 * (2)  sign*Y*a  ==  A   (mod |n|),
-			 *
-			 * and that either  A  or  B  is even in the next iteration.
-			 */
-			if (BN_ucmp(B, A) >= 0)
-				{
-				/* -sign*(X + Y)*a == B - A  (mod |n|) */
-				if (!BN_uadd(X, X, Y)) goto err;
-				/* NB: we could use BN_mod_add_quick(X, X, Y, n), but that
-				 * actually makes the algorithm slower */
-				if (!BN_usub(B, B, A)) goto err;
-				}
-			else
-				{
-				/*  sign*(X + Y)*a == A - B  (mod |n|) */
-				if (!BN_uadd(Y, Y, X)) goto err;
-				/* as above, BN_mod_add_quick(Y, Y, X, n) would slow things down */
-				if (!BN_usub(A, A, B)) goto err;
-				}
-			}
-		}
-	else
-		{
-		/* general inversion algorithm */
-
-		while (!BN_is_zero(B))
-			{
-			BIGNUM *tmp;
-			
-			/*
-			 *      0 < B < A,
-			 * (*) -sign*X*a  ==  B   (mod |n|),
-			 *      sign*Y*a  ==  A   (mod |n|)
-			 */
-			
-			/* (D, M) := (A/B, A%B) ... */
-			if (BN_num_bits(A) == BN_num_bits(B))
-				{
-				if (!BN_one(D)) goto err;
-				if (!BN_sub(M,A,B)) goto err;
-				}
-			else if (BN_num_bits(A) == BN_num_bits(B) + 1)
-				{
-				/* A/B is 1, 2, or 3 */
-				if (!BN_lshift1(T,B)) goto err;
-				if (BN_ucmp(A,T) < 0)
-					{
-					/* A < 2*B, so D=1 */
-					if (!BN_one(D)) goto err;
-					if (!BN_sub(M,A,B)) goto err;
-					}
-				else
-					{
-					/* A >= 2*B, so D=2 or D=3 */
-					if (!BN_sub(M,A,T)) goto err;
-					if (!BN_add(D,T,B)) goto err; /* use D (:= 3*B) as temp */
-					if (BN_ucmp(A,D) < 0)
-						{
-						/* A < 3*B, so D=2 */
-						if (!BN_set_word(D,2)) goto err;
-						/* M (= A - 2*B) already has the correct value */
-						}
-					else
-						{
-						/* only D=3 remains */
-						if (!BN_set_word(D,3)) goto err;
-						/* currently  M = A - 2*B,  but we need  M = A - 3*B */
-						if (!BN_sub(M,M,B)) goto err;
-						}
-					}
-				}
-			else
-				{
-				if (!BN_div(D,M,A,B,ctx)) goto err;
-				}
-			
-			/* Now
-			 *      A = D*B + M;
-			 * thus we have
-			 * (**)  sign*Y*a  ==  D*B + M   (mod |n|).
-			 */
-			
-			tmp=A; /* keep the BIGNUM object, the value does not matter */
-			
-			/* (A, B) := (B, A mod B) ... */
-			A=B;
-			B=M;
-			/* ... so we have  0 <= B < A  again */
-			
-			/* Since the former  M  is now  B  and the former  B  is now  A,
-			 * (**) translates into
-			 *       sign*Y*a  ==  D*A + B    (mod |n|),
-			 * i.e.
-			 *       sign*Y*a - D*A  ==  B    (mod |n|).
-			 * Similarly, (*) translates into
-			 *      -sign*X*a  ==  A          (mod |n|).
-			 *
-			 * Thus,
-			 *   sign*Y*a + D*sign*X*a  ==  B  (mod |n|),
-			 * i.e.
-			 *        sign*(Y + D*X)*a  ==  B  (mod |n|).
-			 *
-			 * So if we set  (X, Y, sign) := (Y + D*X, X, -sign),  we arrive back at
-			 *      -sign*X*a  ==  B   (mod |n|),
-			 *       sign*Y*a  ==  A   (mod |n|).
-			 * Note that  X  and  Y  stay non-negative all the time.
-			 */
-			
-			/* most of the time D is very small, so we can optimize tmp := D*X+Y */
-			if (BN_is_one(D))
-				{
-				if (!BN_add(tmp,X,Y)) goto err;
-				}
-			else
-				{
-				if (BN_is_word(D,2))
-					{
-					if (!BN_lshift1(tmp,X)) goto err;
-					}
-				else if (BN_is_word(D,4))
-					{
-					if (!BN_lshift(tmp,X,2)) goto err;
-					}
-				else if (D->top == 1)
-					{
-					if (!BN_copy(tmp,X)) goto err;
-					if (!BN_mul_word(tmp,D->d[0])) goto err;
-					}
-				else
-					{
-					if (!BN_mul(tmp,D,X,ctx)) goto err;
-					}
-				if (!BN_add(tmp,tmp,Y)) goto err;
-				}
-			
-			M=Y; /* keep the BIGNUM object, the value does not matter */
-			Y=X;
-			X=tmp;
-			sign = -sign;
-			}
-		}
-		
-	/*
-	 * The while loop (Euclid's algorithm) ends when
-	 *      A == gcd(a,n);
-	 * we have
-	 *       sign*Y*a  ==  A  (mod |n|),
-	 * where  Y  is non-negative.
-	 */
-
-	if (sign < 0)
-		{
-		if (!BN_sub(Y,n,Y)) goto err;
-		}
-	/* Now  Y*a  ==  A  (mod |n|).  */
-	
-
-	if (BN_is_one(A))
-		{
-		/* Y*a == 1  (mod |n|) */
-		if (!Y->neg && BN_ucmp(Y,n) < 0)
-			{
-			if (!BN_copy(R,Y)) goto err;
-			}
-		else
-			{
-			if (!BN_nnmod(R,Y,n,ctx)) goto err;
-			}
-		}
-	else
-		{
-		BNerr(BN_F_BN_MOD_INVERSE,BN_R_NO_INVERSE);
-		goto err;
-		}
-	ret=R;
-err:
-	if ((ret == NULL) && (in == NULL)) BN_free(R);
-	BN_CTX_end(ctx);
-	bn_check_top(ret);
-	return(ret);
-	}
 /* file: BN_nnmod : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_mod.c */
 int BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx)
 	{
@@ -8311,7 +7202,6 @@ int BN_div(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m, const BIGNUM *d,
 	BN_CTX_end(ctx);
 	return(ret);
 	}
-#else
 /* file: BN_div : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_div.c */
 #  elif defined(__x86_64) && defined(SIXTY_FOUR_BIT_LONG)
 int BN_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *divisor,
@@ -10017,6 +8907,7 @@ static BN_ULONG *bn_expand_internal(const BIGNUM *b, int words) 	{
 	
 #else
 	memset(A,0,sizeof(BN_ULONG)*words); 
+#endif
 }
 
 /* file: OBJ_nid2obj : /Volumes/work/Phd/ECDH/kv_openssl/crypto/objectsobj_dat.c */
@@ -10232,7 +9123,7 @@ static ECDH_DATA *ECDH_DATA_new_method(ENGINE *engine) 	{
 #endif
 	
 	ret->flags = ret->meth->flags;
-	CRYPTO_new_ex_data(CRYPTO_EX_INDEX_ECDH, ret, &ret->ex_data); #if 0
+	CRYPTO_new_ex_data(CRYPTO_EX_INDEX_ECDH, ret, &ret->ex_data);
 		if ((ret->meth->init != NULL) && !ret->meth->init(ret)) 		{
 			CRYPTO_free_ex_data(CRYPTO_EX_INDEX_ECDH, ret, &ret->ex_data);   OPENSSL_free(ret); 		ret=NULL;
 		}	
@@ -10338,60 +9229,176 @@ err:
 	return r;
 }
 
-/* file: bn_rand_range : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_rand.c */
-static int bn_rand_range(int pseudo, BIGNUM *r, const BIGNUM *range) 	{
-	int (*bn_rand)(BIGNUM *, int, int, int) = pseudo ? BN_pseudo_rand : BN_rand; 	int n;
-	int count = 100;
+static int bnrand(int pseudorand, BIGNUM *rnd, int bits, int top, int bottom)
+{
+	unsigned char *buf=NULL;
+	int ret=0,bit,bytes,mask;
+	time_t tim;
 	
-	if (range->neg || BN_is_zero(range)) 		{
-		BNerr(BN_F_BN_RAND_RANGE, BN_R_INVALID_RANGE); 		return 0;
+	if (bits == 0)
+	{
+		BN_zero(rnd);
+		return 1;
 	}
 	
-	n = BN_num_bits(range); /* n > 0 */ 
-	/* BN_is_bit_set(range, n - 1) always holds */ 
-	if (n == 1)   BN_zero(r);  else if (!BN_is_bit_set(range, n - 2) && !BN_is_bit_set(range, n - 3)) 		{
+	bytes=(bits+7)/8;
+	bit=(bits-1)%8;
+	mask=0xff<<(bit+1);
+	
+	buf=(unsigned char *)OPENSSL_malloc(bytes);
+	if (buf == NULL)
+	{
+		BNerr(BN_F_BNRAND,ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+	
+	/* make a random number and set the top and bottom bits */
+	time(&tim);
+	RAND_add(&tim,sizeof(tim),0.0);
+	
+	if (pseudorand)
+	{
+		if (RAND_pseudo_bytes(buf, bytes) == -1)
+			goto err;
+	}
+	else
+	{
+		if (RAND_bytes(buf, bytes) <= 0)
+			goto err;
+	}
+	
+#if 1
+	if (pseudorand == 2)
+	{
+		/* generate patterns that are more likely to trigger BN
+		 library bugs */
+		int i;
+		unsigned char c;
+		
+		for (i = 0; i < bytes; i++)
+		{
+			RAND_pseudo_bytes(&c, 1);
+			if (c >= 128 && i > 0)
+				buf[i] = buf[i-1];
+			else if (c < 42)
+				buf[i] = 0;
+			else if (c < 84)
+				buf[i] = 255;
+		}
+	}
+#endif
+	
+	if (top != -1)
+	{
+		if (top)
+		{
+			if (bit == 0)
+			{
+				buf[0]=1;
+				buf[1]|=0x80;
+			}
+			else
+			{
+				buf[0]|=(3<<(bit-1));
+			}
+		}
+		else
+		{
+			buf[0]|=(1<<bit);
+		}
+	}
+	buf[0] &= ~mask;
+	if (bottom) /* set bottom bit if requested */
+		buf[bytes-1]|=1;
+	if (!BN_bin2bn(buf,bytes,rnd)) goto err;
+	ret=1;
+err:
+	if (buf != NULL)
+	{
+		OPENSSL_cleanse(buf,bytes);
+		OPENSSL_free(buf);
+	}
+	bn_check_top(rnd);
+	return(ret);
+}
+
+int     BN_pseudo_rand(BIGNUM *rnd, int bits, int top, int bottom)
+{
+	return bnrand(1, rnd, bits, top, bottom);
+}
+
+int   BN_rand(BIGNUM *rnd, int bits, int top, int bottom)
+{
+	return bnrand(0, rnd, bits, top, bottom);
+}
+
+static int bn_rand_range(int pseudo, BIGNUM *r, const BIGNUM *range)
+{
+	int (*bn_rand)(BIGNUM *, int, int, int) = pseudo ? BN_pseudo_rand : BN_rand;
+	int n;
+	int count = 100;
+	
+	if (range->neg || BN_is_zero(range))
+	{
+		BNerr(BN_F_BN_RAND_RANGE, BN_R_INVALID_RANGE);
+		return 0;
+	}
+	
+	n = BN_num_bits(range); /* n > 0 */
+	
+	/* BN_is_bit_set(range, n - 1) always holds */
+	
+	if (n == 1)
+		BN_zero(r);
+	else if (!BN_is_bit_set(range, n - 2) && !BN_is_bit_set(range, n - 3))
+	{
 		/* range = 100..._2,
 		 * so  3*range (= 11..._2)  is exactly one bit longer than  range */
 		do
 		{
-			if (!bn_rand(r, n + 1, -1, 0)) return 0; 			/* If  r < 3*range,  use  r := r MOD range
-																 * (which is either  r, r - range,  or  r - 2*range).
-																 * Otherwise, iterate once more.
-																 * Since  3*range = 11..._2, each iteration succeeds with
-																 * probability >= .75. */
-			if (BN_cmp(r ,range) >= 0) 				{
-				if (!BN_sub(r, r, range)) return 0;     if (BN_cmp(r, range) >= 0)      if (!BN_sub(r, r, range)) return 0; 				}
+			if (!bn_rand(r, n + 1, -1, 0)) return 0;
+			/* If  r < 3*range,  use  r := r MOD range
+			 * (which is either  r, r - range,  or  r - 2*range).
+			 * Otherwise, iterate once more.
+			 * Since  3*range = 11..._2, each iteration succeeds with
+			 * probability >= .75. */
+			if (BN_cmp(r ,range) >= 0)
+			{
+				if (!BN_sub(r, r, range)) return 0;
+				if (BN_cmp(r, range) >= 0)
+					if (!BN_sub(r, r, range)) return 0;
+			}
 			
-			if (!--count) 				{
-				BNerr(BN_F_BN_RAND_RANGE, BN_R_TOO_MANY_ITERATIONS); 				return 0;
+			if (!--count)
+			{
+				BNerr(BN_F_BN_RAND_RANGE, BN_R_TOO_MANY_ITERATIONS);
+				return 0;
 			}
 			
 		}
-		while (BN_cmp(r, range) >= 0); 		}
+		while (BN_cmp(r, range) >= 0);
+	}
 	else
 	{
 		do
 		{
 			/* range = 11..._2  or  range = 101..._2 */
-			if (!bn_rand(r, n, -1, 0)) return 0; 
-			if (!--count) 				{
-				BNerr(BN_F_BN_RAND_RANGE, BN_R_TOO_MANY_ITERATIONS); 				return 0;
+			if (!bn_rand(r, n, -1, 0)) return 0;
+			
+			if (!--count)
+			{
+				BNerr(BN_F_BN_RAND_RANGE, BN_R_TOO_MANY_ITERATIONS);
+				return 0;
 			}
 		}
-		while (BN_cmp(r, range) >= 0); 		}
+		while (BN_cmp(r, range) >= 0);
+	}
 	
-	bn_check_top(r); 	return 1;
-}
-
-/* file: err_fns_check : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.c */
-static void err_fns_check(void) 	{
-	if (err_fns) return; 	
-	CRYPTO_w_lock(CRYPTO_LOCK_ERR);  if (!err_fns) 		err_fns = &err_defaults;
-	CRYPTO_w_unlock(CRYPTO_LOCK_ERR); 	}
+	bn_check_top(r);
+	return 1;
+}	
 	
-	
-#ifndef HAVE_CRYPTODEV
-#else 
+#ifdef HAVE_CRYPTODEV
 static int
 cryptodev_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 				 const unsigned char *in, size_t inl)
@@ -10604,60 +9611,25 @@ static int surewarehk_modexp_dh(const DH *dh, BIGNUM *r, const BIGNUM *a,
 }
 #endif
 
-static krb5_error_code
-kssl_TKT2tkt(	/* IN     */	krb5_context	krb5context,
-			 /* IN     */	KRB5_TKTBODY	*asn1ticket,
-			 /* OUT    */	krb5_ticket	**krb5ticket,
-			 /* OUT    */	KSSL_ERR *kssl_err  )
-{
-	krb5_error_code			krb5rc = KRB5KRB_ERR_GENERIC;
-	krb5_ticket 			*new5ticket = NULL;
-	ASN1_GENERALSTRING		*gstr_svc, *gstr_host;
-	
-	*krb5ticket = NULL;
-	
-	if (asn1ticket == NULL  ||  asn1ticket->realm == NULL  ||
-		asn1ticket->sname == NULL  || 
-		sk_ASN1_GENERALSTRING_num(asn1ticket->sname->namestring) < 2)
-	{
-		BIO_snprintf(kssl_err->text, KSSL_ERR_MAX,
-					 "Null field in asn1ticket.\n");
-		kssl_err->reason = SSL_R_KRB5_S_RD_REQ;
-		return KRB5KRB_ERR_GENERIC;
-	}
-	
-	kssl_err->reason = SSL_R_KRB5_S_RD_REQ;
-	return ENOMEM;		/*  or  KRB5KRB_ERR_GENERIC;	*/
-}
-
-/* FIXME */
-
-#ifndef OPENSSL_NO_KRB5
-#if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_WIN32)
-#ifndef NO_DEF_KRB5_CCACHE
-typedef	krb5_pointer	krb5_cc_cursor;	/* cursor for sequential lookup */
-#endif /* NO_DEF_KRB5_CCACHE */
-#endif  /* OPENSSL_SYS_WINDOWS || OPENSSL_SYS_WIN32 */
-const EVP_CIPHER *
+/* FixMe const EVP_CIPHER *
 kssl_map_enc(krb5_enctype enctype)
 {
 	switch (enctype)
 	{
-		case ENCTYPE_DES_HMAC_SHA1:		/*    EVP_des_cbc();       */
+		case ENCTYPE_DES_HMAC_SHA1:		/*    EVP_des_cbc();       *
 		case ENCTYPE_DES_CBC_CRC:
 		case ENCTYPE_DES_CBC_MD4:
 		case ENCTYPE_DES_CBC_MD5:
 		case ENCTYPE_DES_CBC_RAW:
 			break;
-		case ENCTYPE_DES3_CBC_SHA1:		/*    EVP_des_ede3_cbc();  */
+		case ENCTYPE_DES3_CBC_SHA1:		/*    EVP_des_ede3_cbc();  *
 		case ENCTYPE_DES3_CBC_SHA:
 		case ENCTYPE_DES3_CBC_RAW:
 			break;
 		default:                return NULL;
 			break;
 	}
-}
-#endif	/* !OPENSSL_NO_KRB5	*/
+}*/
 
 /* file: default_malloc_ex : /Volumes/work/Phd/ECDH/kv_openssl/cryptomem.c */
 static void *default_malloc_ex(size_t num, const char *file, int line)  { return malloc_func(num); } 
@@ -10682,3 +9654,14 @@ static size_t drbg_get_adin(DRBG_CTX *ctx, unsigned char **pout)     	{
 	FIPS_get_timevec(buf, &counter); 	*pout = buf;
 	return sizeof(buf); 	}
 #endif
+
+int ec_GFp_simple_group_copy(EC_GROUP *dest, const EC_GROUP *src)
+{
+	if (!BN_copy(&dest->field, &src->field)) return 0;
+	if (!BN_copy(&dest->a, &src->a)) return 0;
+	if (!BN_copy(&dest->b, &src->b)) return 0;
+	
+	dest->a_is_minus3 = src->a_is_minus3;
+	
+	return 1;
+}
