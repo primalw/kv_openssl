@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <errno.h>
+#include <assert.h>
 #include "obj_mac.h"
 
 #ifdef __cplusplus
@@ -25,6 +26,8 @@ extern "C" {
 #define ub_title			64
 #define ub_email_address		128
 #define ub_serial_number		64
+
+#define CRYPTO_LOCK_EC_PRE_COMP		36
 
 //#define ec_GFp_simple_points_make_affine	ec_GFp_simple_pts_make_affine
 #define STACK_OF(type) struct stack_st_##type
@@ -811,15 +814,6 @@ extern "C" {
 #endif
 /* file: CRYPTO_w_unlock : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
 #ifndef OPENSSL_NO_LOCKING
-#ifndef CRYPTO_w_lock
-#define CRYPTO_w_unlock(type)	\
-	CRYPTO_lock(CRYPTO_UNLOCK|CRYPTO_WRITE,type,__FILE__,__LINE__)
-
-#endif
-#else
-/* file: CRYPTO_w_unlock : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
-#define CRYPTO_w_unlock(a)
-
 #endif
 /* file: ERRFN : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.c */
 #define ERRFN(a) err_fns->cb_##a
@@ -883,28 +877,7 @@ CHECKED_PTR_OF(type, inst)))
 
 /* file: bn_pollute : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
 #ifdef BN_DEBUG
-#ifdef BN_DEBUG_RAND
-#define bn_pollute(a) \
-	do { \
-		const BIGNUM *_bnum1 = (a); \
-		if(_bnum1->top < _bnum1->dmax) { \
-			unsigned char _tmp_char; \
-			/* We cast away const without the compiler knowing, any \
-			 * *genuinely* constant variables that aren't mutable \
-			 * wouldn't be constructed with top!=dmax. */ \
-			BN_ULONG *_not_const; \
-			memcpy(&_not_const, &_bnum1->d, sizeof(BN_ULONG*)); \
-			RAND_pseudo_bytes(&_tmp_char, 1); \
-			memset((unsigned char *)(_not_const + _bnum1->top), _tmp_char, \
-				(_bnum1->dmax - _bnum1->top) * sizeof(BN_ULONG)); \
-		} \
-	} while(0)
 
-#else
-/* file: bn_pollute : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
-#define bn_pollute(a)
-
-#endif
 /* file: engine_table_select : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_int.h */
 #define engine_table_select(t,n) engine_table_select_tmp(t,n,__FILE__,__LINE__)
 
@@ -940,18 +913,6 @@ CHECKED_PTR_OF(type, inst)))
 /* file: ENGINEerr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
 #define ENGINEerr(f,r) ERR_PUT_error(ERR_LIB_ENGINE,(f),(r),__FILE__,__LINE__)
 
-/* file: CRYPTO_add : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
-#ifndef OPENSSL_NO_LOCKING
-#ifndef CRYPTO_w_lock
-#define CRYPTO_add(addr,amount,type)	\
-	CRYPTO_add_lock(addr,amount,type,__FILE__,__LINE__)
-
-#endif
-#else
-/* file: CRYPTO_add : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
-#define CRYPTO_add(a,b,c)	((*(a))+=(b))
-
-#endif
 /* file: EX_IMPL : /Volumes/work/Phd/ECDH/kv_openssl/cryptoex_data.c */
 #define EX_IMPL(a) impl->cb_##a
 
@@ -963,30 +924,6 @@ CHECKED_PTR_OF(type, inst)))
 	err_clear_data(p,i); \
 	(p)->err_file[i]=NULL; \
 	(p)->err_line[i]= -1; \
-	} while(0)
-
-/* file: bn_expand : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
-#define bn_expand(a,bits) ((((((bits+BN_BITS2-1))/BN_BITS2)) <= (a)->dmax)?\
-	(a):bn_expand2((a),(bits+BN_BITS2-1)/BN_BITS2))
-
-/* file: BN_get_flags : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
-#define BN_get_flags(b,n)	((b)->flags&(n))
-
-/* file: BN_zero : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
-#ifdef OPENSSL_NO_DEPRECATED
-#define BN_zero(a)	BN_zero_ex(a)
-
-#else
-/* file: BN_zero : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
-#define BN_zero(a)	(BN_set_word((a),0))
-
-#endif
-/* file: BN_zero_ex : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
-#define BN_zero_ex(a) \
-	do { \
-		BIGNUM *_tmp_bn = (a); \
-		_tmp_bn->top = 0; \
-		_tmp_bn->neg = 0; \
 	} while(0)
 
 /* file: mul : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_lcl.h */
@@ -1012,44 +949,9 @@ CHECKED_PTR_OF(type, inst)))
 #endif /* !BN_LLONG */
 /* file: HBITS : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_lcl.h */
 #ifdef BN_LLONG
-#define HBITS(a)	(((a)>>BN_BITS4)&BN_MASK2l)
+
 
 #endif /* !BN_LLONG */
-/* file: bn_wexpand : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
-#define bn_wexpand(a,words) (((words) <= (a)->dmax)?(a):bn_expand2((a),(words)))
-
-/* file: bn_correct_top : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
-#define bn_correct_top(a) \
-        { \
-        BN_ULONG *ftl; \
-	int tmp_top = (a)->top; \
-	if (tmp_top > 0) \
-		{ \
-		for (ftl= &((a)->d[tmp_top-1]); tmp_top > 0; tmp_top--) \
-			if (*(ftl--)) break; \
-		(a)->top = tmp_top; \
-		} \
-	bn_pollute(a); \
-	}
-
-/* file: OPENSSL_realloc : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
-#define OPENSSL_realloc(addr,num) \
-	CRYPTO_realloc((char *)addr,(int)num,__FILE__,__LINE__)
-
-/* file: lh_MEM_insert : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
-#define lh_MEM_insert(lh,inst) LHM_lh_insert(MEM,lh,inst)
-
-/* file: BUFerr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
-#define BUFerr(f,r)  ERR_PUT_error(ERR_LIB_BUF,(f),(r),__FILE__,__LINE__)
-
-/* file: CONFerr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
-#define CONFerr(f,r) ERR_PUT_error(ERR_LIB_CONF,(f),(r),__FILE__,__LINE__)
-
-/* file: sk_CONF_VALUE_num : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
-#define sk_CONF_VALUE_num(st) SKM_sk_num(CONF_VALUE, (st))
-
-/* file: X509err : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
-#define X509err(f,r) ERR_PUT_error(ERR_LIB_X509,(f),(r),__FILE__,__LINE__)
 
 /* file: sk_ASN1_STRING_TABLE_find : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
 #define sk_ASN1_STRING_TABLE_find(st, val) SKM_sk_find(ASN1_STRING_TABLE, (st), (val))
@@ -1063,16 +965,6 @@ CHECKED_PTR_OF(type, inst)))
 
 /* file: char_to_int : /Volumes/work/Phd/ECDH/kv_openssl/crypto/biob_print.c */
 #define char_to_int(p) (p - '0')
-
-/* file: sk_X509_NAME_ENTRY_num : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
-#define sk_X509_NAME_ENTRY_num(st) SKM_sk_num(X509_NAME_ENTRY, (st))
-
-/* file: sk_X509_NAME_ENTRY_insert : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
-#define sk_X509_NAME_ENTRY_insert(st, val, i) SKM_sk_insert(X509_NAME_ENTRY, (st), (val), (i))
-
-/* file: SKM_sk_insert : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
-#define SKM_sk_insert(type, st,val, i) \
-	sk_insert(CHECKED_STACK_OF(type, st), CHECKED_PTR_OF(type, val), i)
 
 /* file: memmove : /Volumes/work/Phd/ECDH/kv_openssl/e_os.h */
 #if defined(sun) && !defined(__svr4__) && !defined(__SVR4)
@@ -1152,15 +1044,6 @@ CHECKED_PTR_OF(type, inst)))
 
 /* file: CRYPTO_r_unlock : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
 #ifndef OPENSSL_NO_LOCKING
-#ifndef CRYPTO_w_lock
-#define CRYPTO_r_unlock(type)	\
-	CRYPTO_lock(CRYPTO_UNLOCK|CRYPTO_READ,type,__FILE__,__LINE__)
-
-#endif
-#else
-/* file: CRYPTO_r_unlock : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
-#define CRYPTO_r_unlock(a)
-
 #endif
 /* file: lh_MEM_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
 #define lh_MEM_new() LHM_lh_new(MEM,mem)
@@ -1200,11 +1083,7 @@ CHECKED_PTR_OF(type, inst)))
 
 /* file: CTXDBG_ENTRY : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
 #ifdef BN_CTX_DEBUG
-#define CTXDBG_ENTRY(str, ctx)	do { \
-				ctxdbg_cur = (str); \
-				fprintf(stderr,"Starting %s\n", ctxdbg_cur); \
-				ctxdbg(ctx); \
-				} while(0)
+
 #endif /* FIXME */
 
 /* file: CTXDBG_EXIT : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_ctx.c */
@@ -1454,7 +1333,178 @@ sk_set(CHECKED_STACK_OF(type, st), i, CHECKED_PTR_OF(type, val))
 /* file: sk_CONF_VALUE_value : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
 #define sk_CONF_VALUE_value(st, i) SKM_sk_value(CONF_VALUE, (st), (i))
 
+#define ASN1_OCTET_STRING_free(a) 1;
+
+/* file: SKM_sk_num : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#define SKM_sk_num(type, st) \
+sk_num(CHECKED_STACK_OF(type, st))
+
+/* file: sk_X509_NAME_ENTRY_num : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#define sk_X509_NAME_ENTRY_num(st) SKM_sk_num(X509_NAME_ENTRY, (st))
+
+/* file: sk_X509_NAME_ENTRY_insert : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#define sk_X509_NAME_ENTRY_insert(st, val, i) SKM_sk_insert(X509_NAME_ENTRY, (st), (val), (i))
+
+	/* file: sk_X509_NAME_ENTRY_num : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#define sk_X509_NAME_ENTRY_num(st) SKM_sk_num(X509_NAME_ENTRY, (st))
+	
+	/* file: sk_X509_NAME_ENTRY_insert : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#define sk_X509_NAME_ENTRY_insert(st, val, i) SKM_sk_insert(X509_NAME_ENTRY, (st), (val), (i))
+	
+/* file: SKM_sk_insert : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#define SKM_sk_insert(type, st,val, i) \
+sk_insert(CHECKED_STACK_OF(type, st), CHECKED_PTR_OF(type, val), i)
+
+/* file: sk_CONF_VALUE_num : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#define sk_CONF_VALUE_num(st) SKM_sk_num(CONF_VALUE, (st))
+
+	/* file: lh_MEM_insert : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stacksafestack.h */
+#define lh_MEM_insert(lh,inst) LHM_lh_insert(MEM,lh,inst)
+
+#define LHM_lh_insert(type, lh, inst) \
+((type *)lh_insert(CHECKED_LHASH_OF(type, lh), \
+CHECKED_PTR_OF(type, inst)))
+
+/* file: bn_wexpand : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+#define bn_wexpand(a,words) (((words) <= (a)->dmax)?(a):bn_expand2((a),(words)))
+
+/* file: bn_expand : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+#define bn_expand(a,bits) ((((((bits+BN_BITS2-1))/BN_BITS2)) <= (a)->dmax)?\
+(a):bn_expand2((a),(bits+BN_BITS2-1)/BN_BITS2))
+
+	/* file: bn_correct_top : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+#define bn_correct_top(a) \
+{ \
+BN_ULONG *ftl; \
+int tmp_top = (a)->top; \
+if (tmp_top > 0) \
+{ \
+for (ftl= &((a)->d[tmp_top-1]); tmp_top > 0; tmp_top--) \
+if (*(ftl--)) break; \
+(a)->top = tmp_top; \
+} \
+bn_pollute(a); \
+}
+
+#ifdef BN_DEBUG_RAND
+#define bn_pollute(a) \
+do { \
+const BIGNUM *_bnum1 = (a); \
+if(_bnum1->top < _bnum1->dmax) { \
+unsigned char _tmp_char; \
+/* We cast away const without the compiler knowing, any \
+* *genuinely* constant variables that aren't mutable \
+* wouldn't be constructed with top!=dmax. */ \
+BN_ULONG *_not_const; \
+memcpy(&_not_const, &_bnum1->d, sizeof(BN_ULONG*)); \
+RAND_pseudo_bytes(&_tmp_char, 1); \
+memset((unsigned char *)(_not_const + _bnum1->top), _tmp_char, \
+(_bnum1->dmax - _bnum1->top) * sizeof(BN_ULONG)); \
+} \
+} while(0)
+	
+#else
+	/* file: bn_pollute : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+#define bn_pollute(a)
+#endif
+
+#define bn_check_top(a) \
+do { \
+const BIGNUM *_bnum2 = (a); \
+if (_bnum2 != NULL) { \
+assert((_bnum2->top == 0) || \
+(_bnum2->d[_bnum2->top - 1] != 0)); \
+bn_pollute(_bnum2); \
+} \
+} while(0)
+
+	/* file: OPENSSL_realloc : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
+#define OPENSSL_realloc(addr,num) \
+CRYPTO_realloc((char *)addr,(int)num,__FILE__,__LINE__)
+	
+	/* file: BUFerr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+#define BUFerr(f,r)  ERR_PUT_error(ERR_LIB_BUF,(f),(r),__FILE__,__LINE__)
+	
+	/* file: CONFerr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+#define CONFerr(f,r) ERR_PUT_error(ERR_LIB_CONF,(f),(r),__FILE__,__LINE__)
+	
+	/* file: X509err : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.h */
+#define X509err(f,r) ERR_PUT_error(ERR_LIB_X509,(f),(r),__FILE__,__LINE__)
+
+#define LBITS(a)	((a)&BN_MASK2l)
+#define HBITS(a)	(((a)>>BN_BITS4)&BN_MASK2l)
+
+#define DECIMAL_SIZE(type)	((sizeof(type)*8+2)/3+1)
+
+#define CTXDBG_RET(ctx,ret)
+
+#define CTXDBG_EXIT(ctx)
+
+#define CTXDBG_ENTRY(str, ctx)	fprintf(stderr, "Starting");
+//ctxdbg_cur = (str); \ FixMe
+//fprintf(stderr,"Starting %s\n", ctxdbg_cur); \
+//ctxdbg(ctx); \
+} while(0)
+
+#ifndef CRYPTO_w_lock
+#define CRYPTO_w_unlock(type)	\
+CRYPTO_lock(CRYPTO_UNLOCK|CRYPTO_WRITE,type,__FILE__,__LINE__)
+#else
+	/* file: CRYPTO_w_unlock : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
+#define CRYPTO_w_unlock(a)
+#endif
+
+#ifndef CRYPTO_w_lock
+#define CRYPTO_r_unlock(type)	\
+CRYPTO_lock(CRYPTO_UNLOCK|CRYPTO_READ,type,__FILE__,__LINE__)
+#else
+	/* file: CRYPTO_r_unlock : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
+#define CRYPTO_r_unlock(a)
+#endif
+
+	/* file: CRYPTO_add : /Volumes/work/Phd/ECDH/kv_openssl/cryptocrypto.h */
+#ifndef OPENSSL_NO_LOCKING
+#ifndef CRYPTO_w_lock
+#define CRYPTO_add(addr,amount,type)	\
+CRYPTO_add_lock(addr,amount,type,__FILE__,__LINE__)
+#endif
+#else
+#endif
+
+#define CRYPTO_add(a,b,c)	((*(a))+=(b))
+
+	/* file: BN_zero : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+#ifdef OPENSSL_NO_DEPRECATED
+#define BN_zero(a)	BN_zero_ex(a)
+#else
+/* file: BN_zero : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+#define BN_zero(a)	(BN_set_word((a),0))	
+#endif
+	/* file: BN_zero_ex : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+#define BN_zero_ex(a) \
+do { \
+BIGNUM *_tmp_bn = (a); \
+_tmp_bn->top = 0; \
+_tmp_bn->neg = 0; \
+} while(0)
+	
+#define BN_is_zero(a)       ((a)->top == 0)
+
+/* file: BN_get_flags : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn.h */
+#define BN_get_flags(b,n)	((b)->flags&(n))
+
+#define mul_add(r,a,bl,bh,c) { \
+BN_ULONG l,h; \
+}
+
+#define mul(r,a,bl,bh,c) { \
+BN_ULONG l,h; \
+}
+
 /********** Global Variabls and Structures **********/ 
+
+	extern const unsigned char os_toebcdic[256];
+	extern const unsigned char os_toascii[256];
 
 	struct crypto_ex_data_st
 	{
@@ -3909,9 +3959,9 @@ sk_set(CHECKED_STACK_OF(type, st), i, CHECKED_PTR_OF(type, val))
 	};
 	
 	static const ASN1_OBJECT nid_objs[1];
-	const EC_METHOD *EC_GFp_nistp256_method(void);
-	const EC_METHOD *EC_GFp_nistp224_method(void);
-	const EC_METHOD *EC_GFp_nistp521_method(void);
+	//const EC_METHOD *EC_GFp_nistp256_method(void);
+	//const EC_METHOD *EC_GFp_nistp224_method(void);
+	//const EC_METHOD *EC_GFp_nistp521_method(void);
 	
 	/* the nist prime curves */
 	static const struct { EC_CURVE_DATA h; unsigned char data[20+24*6]; }
@@ -5668,7 +5718,7 @@ sk_set(CHECKED_STACK_OF(type, st), i, CHECKED_PTR_OF(type, val))
 		{ NID_secp192k1, &_EC_SECG_PRIME_192K1.h, 0, "SECG curve over a 192 bit prime field" },
 		{ NID_secp224k1, &_EC_SECG_PRIME_224K1.h, 0, "SECG curve over a 224 bit prime field" },
 #ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
-		{ NID_secp224r1, &_EC_NIST_PRIME_224.h, EC_GFp_nistp224_method, "NIST/SECG curve over a 224 bit prime field" },
+		//{ NID_secp224r1, &_EC_NIST_PRIME_224.h, EC_GFp_nistp224_method, "NIST/SECG curve over a 224 bit prime field" },
 #else
 		{ NID_secp224r1, &_EC_NIST_PRIME_224.h, 0, "NIST/SECG curve over a 224 bit prime field" },
 #endif
@@ -5676,7 +5726,7 @@ sk_set(CHECKED_STACK_OF(type, st), i, CHECKED_PTR_OF(type, val))
 		/* SECG secp256r1 is the same as X9.62 prime256v1 and hence omitted */
 		{ NID_secp384r1, &_EC_NIST_PRIME_384.h, 0, "NIST/SECG curve over a 384 bit prime field" },
 #ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
-		{ NID_secp521r1, &_EC_NIST_PRIME_521.h, EC_GFp_nistp521_method, "NIST/SECG curve over a 521 bit prime field" },
+		//{ NID_secp521r1, &_EC_NIST_PRIME_521.h, EC_GFp_nistp521_method, "NIST/SECG curve over a 521 bit prime field" },
 #else
 		{ NID_secp521r1, &_EC_NIST_PRIME_521.h, 0, "NIST/SECG curve over a 521 bit prime field" },
 #endif
@@ -5688,7 +5738,7 @@ sk_set(CHECKED_STACK_OF(type, st), i, CHECKED_PTR_OF(type, val))
 		{ NID_X9_62_prime239v2, &_EC_X9_62_PRIME_239V2.h, 0, "X9.62 curve over a 239 bit prime field" },
 		{ NID_X9_62_prime239v3, &_EC_X9_62_PRIME_239V3.h, 0, "X9.62 curve over a 239 bit prime field" },
 #ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
-		{ NID_X9_62_prime256v1, &_EC_X9_62_PRIME_256V1.h, EC_GFp_nistp256_method, "X9.62/SECG curve over a 256 bit prime field" },
+		//{ NID_X9_62_prime256v1, &_EC_X9_62_PRIME_256V1.h, EC_GFp_nistp256_method, "X9.62/SECG curve over a 256 bit prime field" },
 #else
 		{ NID_X9_62_prime256v1, &_EC_X9_62_PRIME_256V1.h, 0, "X9.62/SECG curve over a 256 bit prime field" },
 #endif
@@ -8523,6 +8573,8 @@ sk_set(CHECKED_STACK_OF(type, st), i, CHECKED_PTR_OF(type, val))
 	static LHASH_OF(ADDED_OBJ) *added=NULL;
 	static STACK_OF(ASN1_STRING_TABLE) *stable = NULL;
 	
+	static void (*free_func)(void *)            = free;
+	
 
 	/********** Headers **********/ 
 	
@@ -8596,23 +8648,25 @@ sk_set(CHECKED_STACK_OF(type, st), i, CHECKED_PTR_OF(type, val))
 	static int cpy_univ(unsigned long value, void *arg);
 	static int cpy_utf8(unsigned long value, void *arg);
 	
-	static void ssleay_rand_cleanup(void);
+	/*static void ssleay_rand_cleanup(void);
 	static void ssleay_rand_seed(const void *buf, int num);
 	static void ssleay_rand_add(const void *buf, int num, double add_entropy);
 	static int ssleay_rand_bytes(unsigned char *buf, int num, int pseudo);
 	static int ssleay_rand_nopseudo_bytes(unsigned char *buf, int num);
 	static int ssleay_rand_pseudo_bytes(unsigned char *buf, int num);
-	static int ssleay_rand_status(void);
+	static int ssleay_rand_status(void);*/
 	
 	RAND_METHOD rand_ssleay_meth={
-		ssleay_rand_seed,
+	/*	ssleay_rand_seed,
 		ssleay_rand_nopseudo_bytes,
 		ssleay_rand_cleanup,
 		ssleay_rand_add,
 		ssleay_rand_pseudo_bytes,
-		ssleay_rand_status
+		ssleay_rand_status*/
 	};
 	_STACK *sk_new_null(void);
+	
+	void *lh_insert(_LHASH *lh, void *data);
 	
 	static int ipv6_cb(const char *elem, int len, void *usr);
 	
@@ -9149,6 +9203,8 @@ sk_set(CHECKED_STACK_OF(type, st), i, CHECKED_PTR_OF(type, val))
 	/* file: ASN1_STRING_new : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1_lib.c */
 	ASN1_STRING *ASN1_STRING_new(void) 	{
 		return(ASN1_STRING_type_new(V_ASN1_OCTET_STRING)); 	}
+		
+	static void impl_check(void);	
 	
 	/* file: ASN1_TIME_check : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1.h */
 	int ASN1_TIME_check(ASN1_TIME *t);
@@ -9597,6 +9653,7 @@ sk_set(CHECKED_STACK_OF(type, st), i, CHECKED_PTR_OF(type, val))
 	int ec_GFp_simple_field_mul(const EC_GROUP *, BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_CTX *);
 	int ec_GFp_simple_field_sqr(const EC_GROUP *, BIGNUM *r, const BIGNUM *a, BN_CTX *);
 	
+	static int out_utf8(unsigned long value, void *arg);
 	
 #ifdef __cplusplus
 }

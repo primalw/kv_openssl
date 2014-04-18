@@ -1,5 +1,222 @@
 #include "ecdh_low.h"
 
+/* file: is_printable : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c */
+static int is_printable(unsigned long value)
+{
+	int ch;
+	if(value > 0x7f) return 0;
+	ch = (int) value;
+	/* Note: we can't use 'isalnum' because certain accented 
+	 * characters may count as alphanumeric in some environments.
+	 */
+#ifndef CHARSET_EBCDIC
+	if((ch >= 'a') && (ch <= 'z')) return 1;
+	if((ch >= 'A') && (ch <= 'Z')) return 1;
+	if((ch >= '0') && (ch <= '9')) return 1;
+	if ((ch == ' ') || strchr("'()+,-./:=?", ch)) return 1;
+#else /*CHARSET_EBCDIC*/
+	if((ch >= os_toascii['a']) && (ch <= os_toascii['z'])) return 1;
+	if((ch >= os_toascii['A']) && (ch <= os_toascii['Z'])) return 1;
+	if((ch >= os_toascii['0']) && (ch <= os_toascii['9'])) return 1;
+	if ((ch == os_toascii[' ']) || strchr("'()+,-./:=?", os_toebcdic[ch])) return 1;
+#endif /*CHARSET_EBCDIC*/
+	return 0;
+}
+
+static int ecdh_compute_key(void *out, size_t outlen, const EC_POINT *pub_key,
+							EC_KEY *ecdh,
+							void *(*KDF)(const void *in, size_t inlen, void *out, size_t *outlen))
+{
+	BN_CTX *ctx;
+	EC_POINT *tmp=NULL;
+	BIGNUM *x=NULL, *y=NULL;
+	const BIGNUM *priv_key;
+	const EC_GROUP* group;
+	int ret= -1;
+	size_t buflen, len;
+	unsigned char *buf=NULL;
+	
+	if (outlen > INT_MAX)
+	{
+		//ECDHerr(ECDH_F_ECDH_COMPUTE_KEY,ERR_R_MALLOC_FAILURE); /* sort of, anyway */
+		return -1;
+	}
+	
+	if ((ctx = BN_CTX_new()) == NULL) goto err;
+	BN_CTX_start(ctx);
+	x = BN_CTX_get(ctx);
+	y = BN_CTX_get(ctx);
+	
+	//priv_key = EC_KEY_get0_private_key(ecdh); FixMe
+	if (priv_key == NULL)
+	{
+		//ECDHerr(ECDH_F_ECDH_COMPUTE_KEY,ECDH_R_NO_PRIVATE_VALUE);
+		goto err;
+	}
+	
+	group = EC_KEY_get0_group(ecdh);
+	if ((tmp=EC_POINT_new(group)) == NULL)
+	{
+		//ECDHerr(ECDH_F_ECDH_COMPUTE_KEY,ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+	
+	if (!EC_POINT_mul(group, tmp, NULL, pub_key, priv_key, ctx)) 
+	{
+		//ECDHerr(ECDH_F_ECDH_COMPUTE_KEY,ECDH_R_POINT_ARITHMETIC_FAILURE);
+		goto err;
+	}
+	
+	//if (EC_METHOD_get_field_type(EC_GROUP_method_of(group)) == NID_X9_62_prime_field) 
+	//{
+		if (!EC_POINT_get_affine_coordinates_GFp(group, tmp, x, y, ctx)) 
+		{
+			//ECDHerr(ECDH_F_ECDH_COMPUTE_KEY,ECDH_R_POINT_ARITHMETIC_FAILURE);
+			goto err;
+		}
+	//}
+#ifndef OPENSSL_NO_EC2M
+	else
+	{
+		//if (!EC_POINT_get_affine_coordinates_GF2m(group, tmp, x, y, ctx)) 
+		//{
+			//ECDHerr(ECDH_F_ECDH_COMPUTE_KEY,ECDH_R_POINT_ARITHMETIC_FAILURE);
+			goto err;
+		//}
+	}
+#endif
+	
+	buflen = (EC_GROUP_get_degree(group) + 7)/8;
+	len = BN_num_bytes(x);
+	if (len > buflen)
+	{
+		//ECDHerr(ECDH_F_ECDH_COMPUTE_KEY,ERR_R_INTERNAL_ERROR);
+		goto err;
+	}
+	if ((buf = OPENSSL_malloc(buflen)) == NULL)
+	{
+		//ECDHerr(ECDH_F_ECDH_COMPUTE_KEY,ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+	
+	memset(buf, 0, buflen - len);
+	if (len != (size_t)BN_bn2bin(x, buf + buflen - len))
+	{
+		//ECDHerr(ECDH_F_ECDH_COMPUTE_KEY,ERR_R_BN_LIB);
+		goto err;
+	}
+	
+	if (KDF != 0)
+	{
+		if (KDF(buf, buflen, out, &outlen) == NULL)
+		{
+			//ECDHerr(ECDH_F_ECDH_COMPUTE_KEY,ECDH_R_KDF_FAILED);
+			goto err;
+		}
+		ret = outlen;
+	}
+	else
+	{
+		/* no KDF, just copy as much as we can */
+		if (outlen > buflen)
+			outlen = buflen;
+		memcpy(out, buf, outlen);
+		ret = outlen;
+	}
+	
+err:
+	if (tmp) EC_POINT_free(tmp);
+	if (ctx) BN_CTX_end(ctx);
+	if (ctx) BN_CTX_free(ctx);
+	if (buf) OPENSSL_free(buf);
+	return(ret);
+}
+
+
+/* file: ecdh_data_dup : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecdhech_lib.c */
+static void *ecdh_data_dup(void *data)
+{
+	ECDH_DATA *r = (ECDH_DATA *)data;
+	
+	/* XXX: dummy operation */
+	if (r == NULL)
+		return NULL;
+	
+	return (void *)ecdh_data_new();
+}
+
+/* file: ipv6_cb : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3v3_utl.c */
+static int ipv6_cb(const char *elem, int len, void *usr)
+{
+	IPV6_STAT *s = usr;
+	/* Error if 16 bytes written */
+	if (s->total == 16)
+		return 0;
+	if (len == 0)
+	{
+		/* Zero length element, corresponds to '::' */
+		if (s->zero_pos == -1)
+			s->zero_pos = s->total;
+		/* If we've already got a :: its an error */
+		else if (s->zero_pos != s->total)
+			return 0;
+		s->zero_cnt++;
+	}
+
+	return 1;
+}
+
+static int traverse_string(const unsigned char *p, int len, int inform,
+						   int (*rfunc)(unsigned long value, void *in), void *arg)
+{
+	unsigned long value;
+	int ret;
+	while(len) {
+		if(inform == MBSTRING_ASC) {
+			value = *p++;
+			len--;
+		} else if(inform == MBSTRING_BMP) {
+			value = *p++ << 8;
+			value |= *p++;
+			len -= 2;
+		} else if(inform == MBSTRING_UNIV) {
+			value = ((unsigned long)*p++) << 24;
+			value |= ((unsigned long)*p++) << 16;
+			value |= *p++ << 8;
+			value |= *p++;
+			len -= 4;
+		} else {
+			ret = UTF8_getc(p, len, &value);
+			if(ret < 0) return -1;
+			len -= ret;
+			p += ret;
+		}
+		if(rfunc) {
+			ret = rfunc(value, arg);
+			if(ret <= 0) return ret;
+		}
+	}
+	return 1;
+}
+
+/* file: type_str : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c */
+static int type_str(unsigned long value, void *arg)
+{
+	unsigned long types;
+	types = *((unsigned long *)arg);
+	if((types & B_ASN1_PRINTABLESTRING) && !is_printable(value))
+		types &= ~B_ASN1_PRINTABLESTRING;
+	if((types & B_ASN1_IA5STRING) && (value > 127))
+		types &= ~B_ASN1_IA5STRING;
+	if((types & B_ASN1_T61STRING) && (value > 0xff))
+		types &= ~B_ASN1_T61STRING;
+	if((types & B_ASN1_BMPSTRING) && (value > 0xffff))
+		types &= ~B_ASN1_BMPSTRING;
+	if(!types) return -1;
+	*((unsigned long *)arg) = types;
+	return 1;
+}
+
 /* file: err_fns_check : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.c */
 static void err_fns_check(void) 	{
 	/*if (err_fns) return; 	
@@ -390,7 +607,7 @@ GENERAL_NAME *a2i_GENERAL_NAME(GENERAL_NAME *out,
 		gen = out;
 	else
 		{
-		gen = GENERAL_NAME_new();
+		// gen = GENERAL_NAME_new(); FixMe
 		if(gen == NULL)
 			{
 			X509V3err(X509V3_F_A2I_GENERAL_NAME,ERR_R_MALLOC_FAILURE);
@@ -718,7 +935,7 @@ int OBJ_sn2nid(const char *s)
 		adp=lh_ADDED_OBJ_retrieve(added,&ad);
 		if (adp != NULL) return (adp->obj->nid);
 		}
-	op=OBJ_bsearch_sn(&oo, sn_objs, NUM_SN);
+	//op=OBJ_bsearch_sn(&oo, sn_objs, NUM_SN); FixMe
 	if (op == NULL) return(NID_undef);
 	return(nid_objs[*op].nid);
 	}
@@ -738,7 +955,7 @@ int OBJ_ln2nid(const char *s)
 		adp=lh_ADDED_OBJ_retrieve(added,&ad);
 		if (adp != NULL) return (adp->obj->nid);
 		}
-	op=OBJ_bsearch_ln(&oo, ln_objs, NUM_LN);
+	// op=OBJ_bsearch_ln(&oo, ln_objs, NUM_LN); FixMe
 	if (op == NULL) return(NID_undef);
 	return(nid_objs[*op].nid);
 	}
@@ -943,7 +1160,7 @@ ENGINE *ENGINE_get_default_RAND(void)
 	}
 /* file: engine_table_select_tmp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_table.c */
 #ifndef ENGINE_TABLE_DEBUG
-ENGINE *engine_table_select_tmp(ENGINE_TABLE **table, int nid, const char *f, int l)
+ENGINE *engine_table_select(ENGINE_TABLE **table, int nid)
 #endif
 	{
 	ENGINE *ret = NULL;
@@ -1079,7 +1296,7 @@ int engine_unlocked_finish(ENGINE *e, int unlock_for_handlers)
 	 * there's a chance that both threads will together take the count from
 	 * 2 to 0 without either calling finish(). */
 	e->funct_ref--;
-	engine_ref_debug(e, 1, -1);
+	//engine_ref_debug(e, 1, -1);
 	if((e->funct_ref == 0) && e->finish)
 		{
 		if(unlock_for_handlers)
@@ -1100,7 +1317,7 @@ int engine_unlocked_finish(ENGINE *e, int unlock_for_handlers)
 	/* Release the structural reference too */
 	if(!engine_free_util(e, 0))
 		{
-		ENGINEerr(ENGINE_F_ENGINE_UNLOCKED_FINISH,ENGINE_R_FINISH_FAILED);
+		//ENGINEerr(ENGINE_F_ENGINE_UNLOCKED_FINISH,ENGINE_R_FINISH_FAILED); FixMe
 		return 0;
 		}
 	return to_return;
@@ -1112,8 +1329,8 @@ int engine_free_util(ENGINE *e, int locked)
 
 	if(e == NULL)
 		{
-		ENGINEerr(ENGINE_F_ENGINE_FREE_UTIL,
-			ERR_R_PASSED_NULL_PARAMETER);
+		//ENGINEerr(ENGINE_F_ENGINE_FREE_UTIL,
+		//	ERR_R_PASSED_NULL_PARAMETER); FixMe
 		return 0;
 		}
 	if(locked)
@@ -1245,7 +1462,7 @@ void EVP_PKEY_asn1_free(EVP_PKEY_ASN1_METHOD *ameth)
 void CRYPTO_free_ex_data(int class_index, void *obj, CRYPTO_EX_DATA *ad)
 	{
 	IMPL_CHECK
-	sb_free_ex_data(class_index, obj, ad);
+	//sb_free_ex_data(class_index, obj, ad); FixMe
 	}
 /* file: ERR_pop_to_mark : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.c */
 int ERR_pop_to_mark(void)
@@ -1271,6 +1488,12 @@ const RAND_METHOD *ENGINE_get_RAND(const ENGINE *e)
 	{
 	return e->rand_meth;
 	}
+/* file: sk_new_null : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stackstack.c */
+_STACK *sk_new_null(void)
+{
+	return NULL;//sk_new((int (*)(const void *, const void *))0);
+}
+
 /* file: ENGINE_finish : /Volumes/work/Phd/ECDH/kv_openssl/crypto/engineeng_init.c */
 int ENGINE_finish(ENGINE *e)
 	{
@@ -1278,7 +1501,7 @@ int ENGINE_finish(ENGINE *e)
 
 	if(e == NULL)
 		{
-		ENGINEerr(ENGINE_F_ENGINE_FINISH,ERR_R_PASSED_NULL_PARAMETER);
+		// ENGINEerr(ENGINE_F_ENGINE_FINISH,ERR_R_PASSED_NULL_PARAMETER);
 		return 0;
 		}
 	CRYPTO_w_lock(CRYPTO_LOCK_ENGINE);
@@ -1286,7 +1509,7 @@ int ENGINE_finish(ENGINE *e)
 	CRYPTO_w_unlock(CRYPTO_LOCK_ENGINE);
 	if(!to_return)
 		{
-		ENGINEerr(ENGINE_F_ENGINE_FINISH,ENGINE_R_FINISH_FAILED);
+		// ENGINEerr(ENGINE_F_ENGINE_FINISH,ENGINE_R_FINISH_FAILED);
 		return 0;
 		}
 	return to_return;
@@ -2161,7 +2384,7 @@ ASN1_OCTET_STRING *a2i_IPADDRESS_NC(const char *ipasc)
 	if (!iplen2 || (iplen1 != iplen2))
 		goto err;
 
-	ret = ASN1_OCTET_STRING_new();
+	// ret = ASN1_OCTET_STRING_new(); FixMe
 	if (!ret)
 		goto err;
 	if (!ASN1_OCTET_STRING_set(ret, ipout, iplen1 + iplen2))
@@ -2326,7 +2549,8 @@ static int ipv4_from_asc(unsigned char *v4, const char *in)
 	}
 /* file: ASN1_OCTET_STRING_set : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_octet.c */
 int ASN1_OCTET_STRING_set(ASN1_OCTET_STRING *x, const unsigned char *d, int len)
-{ return M_ASN1_OCTET_STRING_set(x, d, len); }
+{ //return M_ASN1_OCTET_STRING_set(x, d, len); FixMe
+ return 1;}
 /* file: a2i_IPADDRESS : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3v3_utl.c */
 ASN1_OCTET_STRING *a2i_IPADDRESS(const char *ipasc)
 	{
@@ -2341,7 +2565,7 @@ ASN1_OCTET_STRING *a2i_IPADDRESS(const char *ipasc)
 	if (!iplen)
 		return NULL;
 
-	ret = ASN1_OCTET_STRING_new();
+	// ret = ASN1_OCTET_STRING_new(); FixMe
 	if (!ret)
 		return NULL;
 	if (!ASN1_OCTET_STRING_set(ret, ipout, iplen))
@@ -2357,25 +2581,33 @@ static int do_dirname(GENERAL_NAME *gen, char *value, X509V3_CTX *ctx)
 	int ret;
 	STACK_OF(CONF_VALUE) *sk;
 	X509_NAME *nm;
-	if (!(nm = X509_NAME_new()))
-		return 0;
-	sk = X509V3_get_section(ctx, value);
+	//if (!(nm = X509_NAME_new()))
+	//	return 0;
+	//sk = X509V3_get_section(ctx, value); FixMe
 	if (!sk)
 		{
 		X509V3err(X509V3_F_DO_DIRNAME,X509V3_R_SECTION_NOT_FOUND);
 		ERR_add_error_data(2, "section=", value);
-		X509_NAME_free(nm);
+		//X509_NAME_free(nm); FixMe
 		return 0;
 		}
 	/* FIXME: should allow other character types... */
 	ret = X509V3_NAME_from_section(nm, sk, MBSTRING_ASC);
-	if (!ret)
-		X509_NAME_free(nm);
+	//if (!ret)
+	//	X509_NAME_free(nm);
 	gen->d.dirn = nm;
 	X509V3_section_free(ctx, sk);
 		
 	return ret;
 	}
+	
+/* file: impl_check : /Volumes/work/Phd/ECDH/kv_openssl/cryptoex_data.c */
+static void impl_check(void) 	{
+	/*CRYPTO_w_lock(CRYPTO_LOCK_EX_DATA);  
+	if(!impl) 		impl = &impl_default;
+	CRYPTO_w_unlock(CRYPTO_LOCK_EX_DATA); 	*/
+	}
+	
 /* file: X509V3_NAME_from_section : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509v3v3_utl.c */
 int X509V3_NAME_from_section(X509_NAME *nm, STACK_OF(CONF_VALUE)*dn_sk,
 						unsigned long chtype)
@@ -2431,7 +2663,7 @@ int X509_NAME_add_entry_by_txt(X509_NAME *name, const char *field, int type,
 	ne = X509_NAME_ENTRY_create_by_txt(NULL, field, type, bytes, len);
 	if(!ne) return 0;
 	ret = X509_NAME_add_entry(name, ne, loc, set);
-	X509_NAME_ENTRY_free(ne);
+	// X509_NAME_ENTRY_free(ne); FixMe
 	return ret;
 }
 /* file: X509_NAME_ENTRY_create_by_txt : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509x509name.c */
@@ -2461,8 +2693,8 @@ X509_NAME_ENTRY *X509_NAME_ENTRY_create_by_OBJ(X509_NAME_ENTRY **ne,
 
 	if ((ne == NULL) || (*ne == NULL))
 		{
-		if ((ret=X509_NAME_ENTRY_new()) == NULL)
-			return(NULL);
+		//if ((ret=X509_NAME_ENTRY_new()) == NULL) FixMe
+		//	return(NULL);
 		}
 	else
 		ret= *ne;
@@ -2475,8 +2707,8 @@ X509_NAME_ENTRY *X509_NAME_ENTRY_create_by_OBJ(X509_NAME_ENTRY **ne,
 	if ((ne != NULL) && (*ne == NULL)) *ne=ret;
 	return(ret);
 err:
-	if ((ne == NULL) || (ret != *ne))
-		X509_NAME_ENTRY_free(ret);
+	//if ((ne == NULL) || (ret != *ne))
+	//	X509_NAME_ENTRY_free(ret); FixMe
 	return(NULL);
 	}
 /* file: X509_NAME_ENTRY_set_object : /Volumes/work/Phd/ECDH/kv_openssl/crypto/x509x509name.c */
@@ -2540,8 +2772,8 @@ ASN1_STRING_TABLE *ASN1_STRING_TABLE_get(int nid)
 	ASN1_STRING_TABLE *ttmp;
 	ASN1_STRING_TABLE fnd;
 	fnd.nid = nid;
-	ttmp = OBJ_bsearch_table(&fnd, tbl_standard, 
-			   sizeof(tbl_standard)/sizeof(ASN1_STRING_TABLE));
+	//ttmp = OBJ_bsearch_table(&fnd, tbl_standard, FixMe
+	//		   sizeof(tbl_standard)/sizeof(ASN1_STRING_TABLE));
 	if(ttmp) return ttmp;
 	if(!stable) return NULL;
 	idx = sk_ASN1_STRING_TABLE_find(stable, &fnd);
@@ -2727,6 +2959,15 @@ int ASN1_mbstring_ncopy(ASN1_STRING **out, const unsigned char *in, int len,
 	traverse_string(in, len, inform, cpyfunc, &p);
 	return str_type;	
 }
+/* file: in_utf8 : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c */
+static int in_utf8(unsigned long value, void *arg)
+{
+	int *nchar;
+	nchar = arg;
+	(*nchar)++;
+	return 1;
+}
+
 /* file: traverse_string : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c FixMe
 static int traverse_string(const unsigned char *p, int len, int inform,
 		 int (*rfunc)(unsigned long value, void *in), void *arg);
@@ -3075,6 +3316,270 @@ _dopr(
     *retlen = currlen - 1;
     return;
 }
+
+static void
+fmtstr(
+	   char **sbuffer,
+	   char **buffer,
+	   size_t *currlen,
+	   size_t *maxlen,
+	   const char *value,
+	   int flags,
+	   int min,
+	   int max)
+{
+    int padlen, strln;
+    int cnt = 0;
+	
+    if (value == 0)
+        value = "<NULL>";
+    for (strln = 0; value[strln]; ++strln)
+        ;
+    padlen = min - strln;
+    if (padlen < 0)
+        padlen = 0;
+    if (flags & DP_F_MINUS)
+        padlen = -padlen;
+	
+    while ((padlen > 0) && (cnt < max)) {
+        doapr_outch(sbuffer, buffer, currlen, maxlen, ' ');
+        --padlen;
+        ++cnt;
+    }
+    while (*value && (cnt < max)) {
+        doapr_outch(sbuffer, buffer, currlen, maxlen, *value++);
+        ++cnt;
+    }
+    while ((padlen < 0) && (cnt < max)) {
+        doapr_outch(sbuffer, buffer, currlen, maxlen, ' ');
+        ++padlen;
+        ++cnt;
+    }
+}
+
+static void
+fmtint(
+	   char **sbuffer,
+	   char **buffer,
+	   size_t *currlen,
+	   size_t *maxlen,
+	   LLONG value,
+	   int base,
+	   int min,
+	   int max,
+	   int flags)
+{
+    int signvalue = 0;
+    const char *prefix = "";
+    unsigned LLONG uvalue;
+    char convert[DECIMAL_SIZE(value)+3];
+    int place = 0;
+    int spadlen = 0;
+    int zpadlen = 0;
+    int caps = 0;
+	
+    if (max < 0)
+        max = 0;
+    uvalue = value;
+    if (!(flags & DP_F_UNSIGNED)) {
+        if (value < 0) {
+            signvalue = '-';
+            uvalue = -value;
+        } else if (flags & DP_F_PLUS)
+            signvalue = '+';
+        else if (flags & DP_F_SPACE)
+            signvalue = ' ';
+    }
+    if (flags & DP_F_NUM) {
+		if (base == 8) prefix = "0";
+		if (base == 16) prefix = "0x";
+    }
+    if (flags & DP_F_UP)
+        caps = 1;
+    do {
+        convert[place++] =
+		(caps ? "0123456789ABCDEF" : "0123456789abcdef")
+		[uvalue % (unsigned) base];
+        uvalue = (uvalue / (unsigned) base);
+    } while (uvalue && (place < (int)sizeof(convert)));
+    if (place == sizeof(convert))
+        place--;
+    convert[place] = 0;
+	
+    zpadlen = max - place;
+    spadlen = min - OSSL_MAX(max, place) - (signvalue ? 1 : 0) - strlen(prefix);
+    if (zpadlen < 0)
+        zpadlen = 0;
+    if (spadlen < 0)
+        spadlen = 0;
+    if (flags & DP_F_ZERO) {
+        zpadlen = OSSL_MAX(zpadlen, spadlen);
+        spadlen = 0;
+    }
+    if (flags & DP_F_MINUS)
+        spadlen = -spadlen;
+	
+    /* spaces */
+    while (spadlen > 0) {
+        doapr_outch(sbuffer, buffer, currlen, maxlen, ' ');
+        --spadlen;
+    }
+	
+    /* sign */
+    if (signvalue)
+        doapr_outch(sbuffer, buffer, currlen, maxlen, signvalue);
+	
+    /* prefix */
+    while (*prefix) {
+		doapr_outch(sbuffer, buffer, currlen, maxlen, *prefix);
+		prefix++;
+    }
+	
+    /* zeros */
+    if (zpadlen > 0) {
+        while (zpadlen > 0) {
+            doapr_outch(sbuffer, buffer, currlen, maxlen, '0');
+            --zpadlen;
+        }
+    }
+    /* digits */
+    while (place > 0)
+        doapr_outch(sbuffer, buffer, currlen, maxlen, convert[--place]);
+	
+    /* left justified spaces */
+    while (spadlen < 0) {
+        doapr_outch(sbuffer, buffer, currlen, maxlen, ' ');
+        ++spadlen;
+    }
+    return;
+}
+
+static void
+fmtfp(
+	  char **sbuffer,
+	  char **buffer,
+	  size_t *currlen,
+	  size_t *maxlen,
+	  LDOUBLE fvalue,
+	  int min,
+	  int max,
+	  int flags)
+{
+    int signvalue = 0;
+    LDOUBLE ufvalue;
+    char iconvert[20];
+    char fconvert[20];
+    int iplace = 0;
+    int fplace = 0;
+    int padlen = 0;
+    int zpadlen = 0;
+    int caps = 0;
+    long intpart;
+    long fracpart;
+    long max10;
+	
+    if (max < 0)
+        max = 6;
+    //ufvalue = abs_val(fvalue); FixMe
+    if (fvalue < 0)
+        signvalue = '-';
+    else if (flags & DP_F_PLUS)
+        signvalue = '+';
+    else if (flags & DP_F_SPACE)
+        signvalue = ' ';
+	
+    intpart = (long)ufvalue;
+	
+    /* sorry, we only support 9 digits past the decimal because of our
+	 conversion method */
+    if (max > 9)
+        max = 9;
+	
+    /* we "cheat" by converting the fractional part to integer by
+	 multiplying by a factor of 10 */
+    //max10 = roundv(pow_10(max)); FixMe
+    //fracpart = roundv(pow_10(max) * (ufvalue - intpart));
+	
+    if (fracpart >= max10) {
+        intpart++;
+        fracpart -= max10;
+    }
+	
+    /* convert integer part */
+    do {
+        iconvert[iplace++] =
+		(caps ? "0123456789ABCDEF"
+		 : "0123456789abcdef")[intpart % 10];
+        intpart = (intpart / 10);
+    } while (intpart && (iplace < (int)sizeof(iconvert)));
+    if (iplace == sizeof iconvert)
+        iplace--;
+    iconvert[iplace] = 0;
+	
+    /* convert fractional part */
+    do {
+        fconvert[fplace++] =
+		(caps ? "0123456789ABCDEF"
+		 : "0123456789abcdef")[fracpart % 10];
+        fracpart = (fracpart / 10);
+    } while (fplace < max);
+    if (fplace == sizeof fconvert)
+        fplace--;
+    fconvert[fplace] = 0;
+	
+    /* -1 for decimal point, another -1 if we are printing a sign */
+    padlen = min - iplace - max - 1 - ((signvalue) ? 1 : 0);
+    zpadlen = max - fplace;
+    if (zpadlen < 0)
+        zpadlen = 0;
+    if (padlen < 0)
+        padlen = 0;
+    if (flags & DP_F_MINUS)
+        padlen = -padlen;
+	
+    if ((flags & DP_F_ZERO) && (padlen > 0)) {
+        if (signvalue) {
+            doapr_outch(sbuffer, buffer, currlen, maxlen, signvalue);
+            --padlen;
+            signvalue = 0;
+        }
+        while (padlen > 0) {
+            doapr_outch(sbuffer, buffer, currlen, maxlen, '0');
+            --padlen;
+        }
+    }
+    while (padlen > 0) {
+        doapr_outch(sbuffer, buffer, currlen, maxlen, ' ');
+        --padlen;
+    }
+    if (signvalue)
+        doapr_outch(sbuffer, buffer, currlen, maxlen, signvalue);
+	
+    while (iplace > 0)
+        doapr_outch(sbuffer, buffer, currlen, maxlen, iconvert[--iplace]);
+	
+    /*
+     * Decimal point. This should probably use locale to find the correct
+     * char to print out.
+     */
+    if (max > 0 || (flags & DP_F_NUM)) {
+        doapr_outch(sbuffer, buffer, currlen, maxlen, '.');
+		
+        while (fplace > 0)
+            doapr_outch(sbuffer, buffer, currlen, maxlen, fconvert[--fplace]);
+    }
+    while (zpadlen > 0) {
+        doapr_outch(sbuffer, buffer, currlen, maxlen, '0');
+        --zpadlen;
+    }
+	
+    while (padlen < 0) {
+        doapr_outch(sbuffer, buffer, currlen, maxlen, ' ');
+        ++padlen;
+    }
+}
+
+
 /* file: fmtint : /Volumes/work/Phd/ECDH/kv_openssl/crypto/biob_print.c FixMe
 static void fmtint     (char **, char **, size_t *, size_t *,
 			LLONG, int, int, int, int);
@@ -3244,7 +3749,7 @@ int OBJ_obj2nid(const ASN1_OBJECT *a)
 		adp=lh_ADDED_OBJ_retrieve(added,&ad);
 		if (adp != NULL) return (adp->obj->nid);
 		}
-	op=OBJ_bsearch_obj(&a, obj_objs, NUM_OBJ);
+	//op=OBJ_bsearch_obj(&a, obj_objs, NUM_OBJ); FixMe
 	if (op == NULL)
 		return(NID_undef);
 	return(nid_objs[*op].nid);
@@ -3331,8 +3836,8 @@ int X509_NAME_add_entry(X509_NAME *name, X509_NAME_ENTRY *ne, int loc,
 		inc=(set == 0)?1:0;
 		}
 
-	if ((new_name=X509_NAME_ENTRY_dup(ne)) == NULL)
-		goto err;
+	//if ((new_name=X509_NAME_ENTRY_dup(ne)) == NULL) FixMe
+	//	goto err;
 	new_name->set=set;
 	if (!sk_X509_NAME_ENTRY_insert(sk,new_name,loc))
 		{
@@ -3347,8 +3852,8 @@ int X509_NAME_add_entry(X509_NAME *name, X509_NAME_ENTRY *ne, int loc,
 		}	
 	return(1);
 err:
-	if (new_name != NULL)
-		X509_NAME_ENTRY_free(new_name);
+	//if (new_name != NULL)
+	//	X509_NAME_ENTRY_free(new_name);
 	return(0);
 	}
 /* file: sk_insert : /Volumes/work/Phd/ECDH/kv_openssl/crypto/stackstack.c */
@@ -3403,12 +3908,12 @@ static int do_othername(GENERAL_NAME *gen, char *value, X509V3_CTX *ctx)
 	int objlen;
 	if (!(p = strchr(value, ';')))
 		return 0;
-	if (!(gen->d.otherName = OTHERNAME_new()))
-		return 0;
+	//if (!(gen->d.otherName = OTHERNAME_new())) FixMe
+	//	return 0;
 	/* Free this up because we will overwrite it.
 	 * no need to free type_id because it is static
 	 */
-	ASN1_TYPE_free(gen->d.otherName->value);
+	// ASN1_TYPE_free(gen->d.otherName->value); FixMe
 	if (!(gen->d.otherName->value = ASN1_generate_v3(p + 1, ctx)))
 		return 0;
 	objlen = p - value;
@@ -3466,8 +3971,8 @@ ASN1_TYPE *ASN1_generate_v3(char *str, X509V3_CTX *cnf)
 		return ret;
 
 	/* Generate the encoding */
-	cpy_len = i2d_ASN1_TYPE(ret, &orig_der);
-	ASN1_TYPE_free(ret);
+	//cpy_len = i2d_ASN1_TYPE(ret, &orig_der); FixMe
+	// ASN1_TYPE_free(ret); FixMe
 	ret = NULL;
 	/* Set point to start copying for modified encoding */
 	cpy_start = orig_der;
@@ -3552,7 +4057,7 @@ ASN1_TYPE *ASN1_generate_v3(char *str, X509V3_CTX *cnf)
 	cp = new_der;
 
 	/* Obtain new ASN1_TYPE structure */
-	ret = d2i_ASN1_TYPE(NULL, &cp, len);
+	//ret = d2i_ASN1_TYPE(NULL, &cp, len); FixMe
 
 	err:
 	if (orig_der)
@@ -3579,7 +4084,7 @@ static ASN1_TYPE *asn1_multi(int utype, const char *section, X509V3_CTX *cnf)
 		{
 		if (!cnf)
 			goto bad;
-		sect = X509V3_get_section(cnf, (char *)section);
+		// sect = X509V3_get_section(cnf, (char *)section); FixMe
 		if (!sect)
 			goto bad;
 		for (i = 0; i < sk_CONF_VALUE_num(sect); i++)
@@ -3602,8 +4107,8 @@ static ASN1_TYPE *asn1_multi(int utype, const char *section, X509V3_CTX *cnf)
 	if (derlen < 0)
 		goto bad;
 
-	if (!(ret = ASN1_TYPE_new()))
-		goto bad;
+	/* if (!(ret = ASN1_TYPE_new())) Fixme
+		goto bad; */
 
 	if (!(ret->value.asn1_string = ASN1_STRING_type_new(utype)))
 		goto bad;
@@ -3620,8 +4125,8 @@ static ASN1_TYPE *asn1_multi(int utype, const char *section, X509V3_CTX *cnf)
 	if (der)
 		OPENSSL_free(der);
 
-	if (sk)
-		sk_ASN1_TYPE_pop_free(sk, ASN1_TYPE_free);
+	/* if (sk)
+		sk_ASN1_TYPE_pop_free(sk, ASN1_TYPE_free); FixMe */
 	if (sect)
 		X509V3_section_free(cnf, sect);
 
@@ -3644,11 +4149,11 @@ static ASN1_TYPE *asn1_str2type(const char *str, int format, int utype)
 
 	int no_unused = 1;
 
-	if (!(atmp = ASN1_TYPE_new()))
+/*	if (!(atmp = ASN1_TYPE_new())) FixMe
 		{
 		ASN1err(ASN1_F_ASN1_STR2TYPE, ERR_R_MALLOC_FAILURE);
 		return NULL;
-		}
+		} */
 
 	if (!str)
 		str = "";
@@ -3832,7 +4337,7 @@ static ASN1_TYPE *asn1_str2type(const char *str, int format, int utype)
 	ERR_add_error_data(2, "string=", str);
 	bad_form:
 
-	ASN1_TYPE_free(atmp);
+	// ASN1_TYPE_free(atmp); FixME
 	return NULL;
 
 	}
@@ -4770,7 +5275,8 @@ int EC_GROUP_set_curve_GFp(EC_GROUP *group, const BIGNUM *p, const BIGNUM *a, co
 	}
 /* file: ERR_peek_last_error : /Volumes/work/Phd/ECDH/kv_openssl/crypto/errerr.c */
 unsigned long ERR_peek_last_error(void)
-	{ return(get_error_values(0,1,NULL,NULL,NULL,NULL)); }
+	{ //return(get_error_values(0,1,NULL,NULL,NULL,NULL)); 
+	return 1;}
 /* file: EC_GROUP_clear_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_lib.c */
 void EC_GROUP_clear_free(EC_GROUP *group)
 	{
@@ -5825,7 +6331,7 @@ int EC_POINTs_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *scalar,
 		/* use default */
 		return ec_wNAF_mul(group, r, scalar, num, points, scalars, ctx);
 
-	return group->meth->mul(group, r, scalar, num, points, scalars, ctx);
+	return 0;//group->meth->mul(group, r, scalar, num, points, scalars, ctx);
 	}
 /* file: ec_wNAF_mul : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_mult.c */
 int ec_wNAF_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *scalar,
@@ -6453,7 +6959,8 @@ const ECDH_METHOD *ENGINE_get_ECDH(const ENGINE *e)
 int CRYPTO_new_ex_data(int class_index, void *obj, CRYPTO_EX_DATA *ad)
 	{
 	IMPL_CHECK
-	return cb_new_ex_data(class_index, obj, ad); /* FixMe */
+	//return cb_new_ex_data(class_index, obj, ad); /* FixMe */
+	return 0;
 	}
 /* file: EC_KEY_insert_key_method_data : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_key.c */
 void *EC_KEY_insert_key_method_data(EC_KEY *key, void *data,
@@ -7123,9 +7630,6 @@ err:
 	bn_check_top(ret);
 	return(ret);
 	}
-/* file: BN_mod_inverse_no_branch : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_gcd.c */
-static BIGNUM *BN_mod_inverse_no_branch(BIGNUM *in,
-        const BIGNUM *a, const BIGNUM *n, BN_CTX *ctx);
 
 /* file: BN_nnmod : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_mod.c */
 int BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx)
@@ -8252,6 +8756,83 @@ void bn_mul_part_recursive(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b, int n,
 		}
 	}
 #endif /* BN_RECURSION */
+
+_LHASH *lh_new(LHASH_HASH_FN_TYPE h, LHASH_COMP_FN_TYPE c)
+{
+	_LHASH *ret;
+	int i;
+	
+	/*if ((ret=OPENSSL_malloc(sizeof(_LHASH))) == NULL)
+		goto err0;
+	if ((ret->b=OPENSSL_malloc(sizeof(LHASH_NODE *)*MIN_NODES)) == NULL)
+		goto err1;
+	for (i=0; i<MIN_NODES; i++)
+		ret->b[i]=NULL;
+	ret->comp=((c == NULL)?(LHASH_COMP_FN_TYPE)strcmp:c);
+	ret->hash=((h == NULL)?(LHASH_HASH_FN_TYPE)lh_strhash:h);
+	ret->num_nodes=MIN_NODES/2;
+	ret->num_alloc_nodes=MIN_NODES;
+	ret->p=0;
+	ret->pmax=MIN_NODES/2;
+	ret->up_load=UP_LOAD;
+	ret->down_load=DOWN_LOAD;
+	ret->num_items=0;*/
+	
+	ret->num_expands=0;
+	ret->num_expand_reallocs=0;
+	ret->num_contracts=0;
+	ret->num_contract_reallocs=0;
+	ret->num_hash_calls=0;
+	ret->num_comp_calls=0;
+	ret->num_insert=0;
+	ret->num_replace=0;
+	ret->num_delete=0;
+	ret->num_no_delete=0;
+	ret->num_retrieve=0;
+	ret->num_retrieve_miss=0;
+	ret->num_hash_comps=0;
+	
+	ret->error=0;
+	return(ret);
+err1:
+	OPENSSL_free(ret);
+err0:
+	return(NULL);
+}
+
+
+/* file: lh_delete : /Volumes/work/Phd/ECDH/kv_openssl/crypto/lhashlhash.c */
+void *lh_delete(_LHASH *lh, const void *data)
+{
+	unsigned long hash;
+	LHASH_NODE *nn,**rn;
+	void *ret;
+	
+	lh->error=0;
+	// rn=getrn(lh,data,&hash); FixMe
+	
+	if (*rn == NULL)
+	{
+		lh->num_no_delete++;
+		return(NULL);
+	}
+	else
+	{
+		nn= *rn;
+		*rn=nn->next;
+		ret=nn->data;
+		OPENSSL_free(nn);
+		lh->num_delete++;
+	}
+	
+	lh->num_items--;
+	//if ((lh->num_nodes > MIN_NODES) &&
+	//	(lh->down_load >= (lh->num_items*LH_LOAD_MULT/lh->num_nodes)))
+	//	contract(lh);
+	
+	return(ret);
+}
+
 /* file: bn_mul_normal : /Volumes/work/Phd/ECDH/kv_openssl/crypto/bnbn_mul.c */
 void bn_mul_normal(BN_ULONG *r, BN_ULONG *a, int na, BN_ULONG *b, int nb)
 	{
@@ -8975,10 +9556,10 @@ unsigned char *ecdh_low(size_t *secret_len) { 	EC_KEY *key, *peerkey;
 	unsigned char *secret;
 	
 	/* Create an Elliptic Curve Key object and set it up to use the ANSI X9.62 Prime 256v1 curve */
-	if(NULL == (key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1))) handleErrors();   	/* Generate the private and public key */
-	if(1 != EC_KEY_generate_key(key)) handleErrors();   	/* Get the peer's public key, and provide the peer with our public key -
-															 * how this is done will be specific to your circumstances */
-	peerkey = get_peerkey_low(key);   	/* Calculate the size of the buffer for the shared secret */
+	//if(NULL == (key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1))) handleErrors();   	/* Generate the private and public key */
+	//if(1 != EC_KEY_generate_key(key)) handleErrors();   	/* Get the peer's public key, and provide the peer with our public key -
+															/* how this is done will be specific to your circumstances */
+	//peerkey = get_peerkey_low(key);   	/* Calculate the size of the buffer for the shared secret */
 	field_size = EC_GROUP_get_degree(EC_KEY_get0_group(key));  *secret_len = (field_size+7)/8;   	/* Allocate the memory for the shared secret */
 	if(NULL == (secret = OPENSSL_malloc(*secret_len))) handleErrors();   	/* Derive the shared secret */
 	*secret_len = ECDH_compute_key(secret, *secret_len, EC_KEY_get0_public_key(peerkey),            key, NULL); 	
@@ -9254,7 +9835,7 @@ static int bnrand(int pseudorand, BIGNUM *rnd, int bits, int top, int bottom)
 	
 	/* make a random number and set the top and bottom bits */
 	time(&tim);
-	RAND_add(&tim,sizeof(tim),0.0);
+	//RAND_add(&tim,sizeof(tim),0.0);
 	
 	if (pseudorand)
 	{
@@ -9665,3 +10246,1068 @@ int ec_GFp_simple_group_copy(EC_GROUP *dest, const EC_GROUP *src)
 	
 	return 1;
 }
+
+/* file: out_utf8 : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c */
+static int out_utf8(unsigned long value, void *arg)
+{
+	return 1;
+}
+void *lh_insert(_LHASH *lh, void *data)
+{
+	unsigned long hash;
+	LHASH_NODE *nn,**rn;
+	void *ret;
+	
+	//lh->error=0;
+	//if (lh->up_load <= (lh->num_items*LH_LOAD_MULT/lh->num_nodes))
+	//	expand(lh);
+	
+	// rn=getrn(lh,data,&hash); FixMe
+	
+	if (*rn == NULL)
+	{
+		if ((nn=(LHASH_NODE *)OPENSSL_malloc(sizeof(LHASH_NODE))) == NULL)
+		{
+			lh->error++;
+			return(NULL);
+		}
+		nn->data=data;
+		nn->next=NULL;
+#ifndef OPENSSL_NO_HASH_COMP
+		nn->hash=hash;
+#endif
+		*rn=nn;
+		ret=NULL;
+		lh->num_insert++;
+		lh->num_items++;
+	}
+	else /* replace same key */
+	{
+		ret= (*rn)->data;
+		(*rn)->data=data;
+		lh->num_replace++;
+	}
+	return(ret);
+}
+
+/* FixMe on EC_Point calculations */
+
+/* file: ec_pre_comp_free : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_mult.c */
+static void ec_pre_comp_free(void *pre_)
+{
+	int i;
+	EC_PRE_COMP *pre = pre_;
+	
+	if (!pre)
+		return;
+	
+	i = CRYPTO_add(&pre->references, -1, CRYPTO_LOCK_EC_PRE_COMP);
+	if (i > 0)
+		return;
+	
+	if (pre->points)
+	{
+		EC_POINT **p;
+		
+		for (p = pre->points; *p != NULL; p++)
+			EC_POINT_free(*p);
+		OPENSSL_free(pre->points);
+	}
+	OPENSSL_free(pre);
+}
+
+/* file: ec_pre_comp_dup : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_mult.c */
+static void *ec_pre_comp_dup(void *src_)
+{
+	EC_PRE_COMP *src = src_;
+	
+	/* no need to actually copy, these objects never change! */
+	
+	CRYPTO_add(&src->references, 1, CRYPTO_LOCK_EC_PRE_COMP);
+	
+	return src_;
+}
+
+static void ec_pre_comp_clear_free(void *pre_)
+{
+	int i;
+	EC_PRE_COMP *pre = pre_;
+	
+	if (!pre)
+		return;
+	
+	i = CRYPTO_add(&pre->references, -1, CRYPTO_LOCK_EC_PRE_COMP);
+	if (i > 0)
+		return;
+	
+	if (pre->points)
+	{
+		EC_POINT **p;
+		
+		for (p = pre->points; *p != NULL; p++)
+		{
+			EC_POINT_clear_free(*p);
+			OPENSSL_cleanse(p, sizeof *p);
+		}
+		OPENSSL_free(pre->points);
+	}
+	OPENSSL_cleanse(pre, sizeof *pre);
+	OPENSSL_free(pre);
+}
+
+int ec_GFp_simple_set_Jprojective_coordinates_GFp(const EC_GROUP *group, EC_POINT *point,
+												 const BIGNUM *x, const BIGNUM *y, const BIGNUM *z, BN_CTX *ctx)
+{
+	BN_CTX *new_ctx = NULL;
+	int ret = 0;
+	
+	if (ctx == NULL)
+	{
+		ctx = new_ctx = BN_CTX_new();
+		if (ctx == NULL)
+			return 0;
+	}
+	return 1;
+	
+}
+
+/* file: ec_GFp_simple_points_make_affine : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_points_make_affine(const EC_GROUP *group, size_t num, EC_POINT *points[], BN_CTX *ctx)
+{
+	BN_CTX *new_ctx = NULL;
+	BIGNUM *tmp0, *tmp1;
+	size_t pow2 = 0;
+	BIGNUM **heap = NULL;
+	size_t i;
+	int ret = 0;
+	
+	if (num == 0)
+		return 1;
+	
+	if (ctx == NULL)
+	{
+		ctx = new_ctx = BN_CTX_new();
+		if (ctx == NULL)
+			return 0;
+	}
+	
+	return 0;
+}
+
+/* file: ec_GFp_simple_point_set_to_infinity : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_point_set_to_infinity(const EC_GROUP *group, EC_POINT *point)
+{
+	point->Z_is_one = 0;
+	BN_zero(&point->Z);
+	return 1;
+}
+
+/* file: ec_GFp_simple_point_init : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_point_init(EC_POINT *point)
+{
+	BN_init(&point->X);
+	BN_init(&point->Y);
+	BN_init(&point->Z);
+	point->Z_is_one = 0;
+	
+	return 1;
+}
+
+/* file: ec_GFp_simple_point_set_affine_coordinates : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_point_set_affine_coordinates(const EC_GROUP *group, EC_POINT *point,
+											   const BIGNUM *x, const BIGNUM *y, BN_CTX *ctx)
+{
+	if (x == NULL || y == NULL)
+	{
+		/* unlike for projective coordinates, we do not tolerate this */
+		//ECerr(EC_F_EC_GFP_SIMPLE_POINT_SET_AFFINE_COORDINATES, ERR_R_PASSED_NULL_PARAMETER);
+		return 0;
+	}
+	
+	return 0;//EC_POINT_set_Jprojective_coordinates_GFp(group, point, x, y, BN_value_one(), ctx);
+}
+
+/* file: ec_GFp_simple_point_get_affine_coordinates : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_point_get_affine_coordinates(const EC_GROUP *group, const EC_POINT *point,
+											   BIGNUM *x, BIGNUM *y, BN_CTX *ctx)
+{
+	BN_CTX *new_ctx = NULL;
+	BIGNUM *Z, *Z_1, *Z_2, *Z_3;
+	const BIGNUM *Z_;
+	int ret = 0;
+	
+	if (EC_POINT_is_at_infinity(group, point))
+	{
+		//ECerr(EC_F_EC_GFP_SIMPLE_POINT_GET_AFFINE_COORDINATES, EC_R_POINT_AT_INFINITY);
+		return 0;
+	}
+	
+	if (ctx == NULL)
+	{
+		ctx = new_ctx = BN_CTX_new();
+		if (ctx == NULL)
+			return 0;
+	}
+	
+	return ret;
+}
+
+/* file: ec_GFp_simple_point_finish : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+void ec_GFp_simple_point_finish(EC_POINT *point)
+{
+	BN_free(&point->X);
+	BN_free(&point->Y);
+	BN_free(&point->Z);
+}
+
+/* file: ec_GFp_simple_point_copy : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_point_copy(EC_POINT *dest, const EC_POINT *src)
+{
+	if (!BN_copy(&dest->X, &src->X)) return 0;
+	if (!BN_copy(&dest->Y, &src->Y)) return 0;
+	if (!BN_copy(&dest->Z, &src->Z)) return 0;
+	dest->Z_is_one = src->Z_is_one;
+	
+	return 1;
+}
+
+/* file: ec_GFp_simple_point_clear_finish : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+void ec_GFp_simple_point_clear_finish(EC_POINT *point)
+{
+	BN_clear_free(&point->X);
+	BN_clear_free(&point->Y);
+	BN_clear_free(&point->Z);
+	point->Z_is_one = 0;
+}
+
+/* file: ec_GFp_simple_make_affine : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_make_affine(const EC_GROUP *group, EC_POINT *point, BN_CTX *ctx)
+{
+	BN_CTX *new_ctx = NULL;
+	BIGNUM *x, *y;
+	int ret = 0;
+	
+	if (point->Z_is_one || EC_POINT_is_at_infinity(group, point))
+		return 1;
+	
+	if (ctx == NULL)
+	{
+		ctx = new_ctx = BN_CTX_new();
+		if (ctx == NULL)
+			return 0;
+	}
+	
+	return ret;
+}
+
+/* file: ec_GFp_simple_is_on_curve : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_is_on_curve(const EC_GROUP *group, const EC_POINT *point, BN_CTX *ctx)
+{
+	int (*field_mul)(const EC_GROUP *, BIGNUM *, const BIGNUM *, const BIGNUM *, BN_CTX *);
+	int (*field_sqr)(const EC_GROUP *, BIGNUM *, const BIGNUM *, BN_CTX *);
+	const BIGNUM *p;
+	BN_CTX *new_ctx = NULL;
+	BIGNUM *rh, *tmp, *Z4, *Z6;
+	int ret = -1;
+	
+	if (EC_POINT_is_at_infinity(group, point))
+		return 1;
+	
+	field_mul = group->meth->field_mul;
+	field_sqr = group->meth->field_sqr;
+	p = &group->field;
+	
+	if (ctx == NULL)
+	{
+		ctx = new_ctx = BN_CTX_new();
+		if (ctx == NULL)
+			return -1;
+	}
+	
+	return 0;
+}
+
+/* file: ec_GFp_simple_is_at_infinity : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_is_at_infinity(const EC_GROUP *group, const EC_POINT *point)
+{
+	return BN_is_zero(&point->Z);
+}
+
+/* file: ec_GFp_simple_invert : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_invert(const EC_GROUP *group, EC_POINT *point, BN_CTX *ctx)
+{
+	//if (EC_POINT_is_at_infinity(group, point) || BN_is_zero(&point->Y))
+	/* point is its own inverse */
+		return 1;
+	
+	//return BN_usub(&point->Y, &group->field, &point->Y);
+}
+
+/* file: ec_GFp_simple_group_init : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_group_init(EC_GROUP *group)
+{
+	BN_init(&group->field);
+	BN_init(&group->a);
+	BN_init(&group->b);
+	group->a_is_minus3 = 0;
+	return 1;
+}
+
+/* file: ec_GFp_simple_group_get_degree : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_group_get_degree(const EC_GROUP *group)
+{
+	return BN_num_bits(&group->field);
+}
+
+/* file: ec_GFp_simple_group_get_curve : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_group_get_curve(const EC_GROUP *group, BIGNUM *p, BIGNUM *a, BIGNUM *b, BN_CTX *ctx)
+{
+	int ret = 0;
+	BN_CTX *new_ctx = NULL;
+	
+	if (p != NULL)
+	{
+		if (!BN_copy(p, &group->field)) return 0;
+	}
+	
+	if (a != NULL || b != NULL)
+	{
+		if (group->meth->field_decode)
+		{
+			if (ctx == NULL)
+			{
+				ctx = new_ctx = BN_CTX_new();
+				if (ctx == NULL)
+					return 0;
+			}
+			if (a != NULL)
+			{
+				if (!group->meth->field_decode(group, a, &group->a, ctx)) goto err;
+			}
+			if (b != NULL)
+			{
+				if (!group->meth->field_decode(group, b, &group->b, ctx)) goto err;
+			}
+		}
+		else
+		{
+			if (a != NULL)
+			{
+				if (!BN_copy(a, &group->a)) goto err;
+			}
+			if (b != NULL)
+			{
+				if (!BN_copy(b, &group->b)) goto err;
+			}
+		}
+	}
+	
+	ret = 1;
+	
+err:
+	if (new_ctx)
+		BN_CTX_free(new_ctx);
+	return ret;
+}
+
+/* file: ec_GFp_simple_group_finish : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+void ec_GFp_simple_group_finish(EC_GROUP *group)
+{
+	BN_free(&group->field);
+	BN_free(&group->a);
+	BN_free(&group->b);
+}
+
+/* file: ec_GFp_simple_group_clear_finish : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+void ec_GFp_simple_group_clear_finish(EC_GROUP *group)
+{
+	BN_clear_free(&group->field);
+	BN_clear_free(&group->a);
+	BN_clear_free(&group->b);
+}
+
+/* file: ec_GFp_simple_group_check_discriminant : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_group_check_discriminant(const EC_GROUP *group, BN_CTX *ctx)
+{
+	int ret = 0;
+	BIGNUM *a,*b,*order,*tmp_1,*tmp_2;
+	const BIGNUM *p = &group->field;
+	BN_CTX *new_ctx = NULL;
+	
+	if (ctx == NULL)
+	{
+		ctx = new_ctx = BN_CTX_new();
+		if (ctx == NULL)
+		{
+			//ECerr(EC_F_EC_GFP_SIMPLE_GROUP_CHECK_DISCRIMINANT, ERR_R_MALLOC_FAILURE);
+			//goto err;
+		}
+	}
+	
+	return ret;
+}
+
+/* file: ec_GFp_simple_get_Jprojective_coordinates_GFp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_get_Jprojective_coordinates_GFp(const EC_GROUP *group, const EC_POINT *point,
+												  BIGNUM *x, BIGNUM *y, BIGNUM *z, BN_CTX *ctx)
+{
+	BN_CTX *new_ctx = NULL;
+	int ret = 0;
+	
+	if (group->meth->field_decode != 0)
+	{
+		if (ctx == NULL)
+		{
+			ctx = new_ctx = BN_CTX_new();
+			if (ctx == NULL)
+				return 0;
+		}
+		
+		if (x != NULL)
+		{
+			if (!group->meth->field_decode(group, x, &point->X, ctx)) goto err;
+		}
+		if (y != NULL)
+		{
+			if (!group->meth->field_decode(group, y, &point->Y, ctx)) goto err;
+		}
+		if (z != NULL)
+		{
+			if (!group->meth->field_decode(group, z, &point->Z, ctx)) goto err;
+		}
+	}
+	else	
+	{
+		if (x != NULL)
+		{
+			if (!BN_copy(x, &point->X)) goto err;
+		}
+		if (y != NULL)
+		{
+			if (!BN_copy(y, &point->Y)) goto err;
+		}
+		if (z != NULL)
+		{
+			if (!BN_copy(z, &point->Z)) goto err;
+		}
+	}
+	
+	ret = 1;
+	
+err:
+	if (new_ctx != NULL)
+		BN_CTX_free(new_ctx);
+	return ret;
+}
+
+/* file: ec_GFp_simple_dbl : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_dbl(const EC_GROUP *group, EC_POINT *r, const EC_POINT *a, BN_CTX *ctx)
+{
+	int (*field_mul)(const EC_GROUP *, BIGNUM *, const BIGNUM *, const BIGNUM *, BN_CTX *);
+	int (*field_sqr)(const EC_GROUP *, BIGNUM *, const BIGNUM *, BN_CTX *);
+	const BIGNUM *p;
+	BN_CTX *new_ctx = NULL;
+	BIGNUM *n0, *n1, *n2, *n3;
+	int ret = 0;
+	
+	if (EC_POINT_is_at_infinity(group, a))
+	{
+		BN_zero(&r->Z);
+		r->Z_is_one = 0;
+		return 1;
+	}
+	
+	return 1;
+}
+
+/* file: ec_GFp_simple_cmp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_cmp(const EC_GROUP *group, const EC_POINT *a, const EC_POINT *b, BN_CTX *ctx)
+{
+	/* return values:
+	 *  -1   error
+	 *   0   equal (in affine coordinates)
+	 *   1   not equal
+	 */
+	
+	int (*field_mul)(const EC_GROUP *, BIGNUM *, const BIGNUM *, const BIGNUM *, BN_CTX *);
+	int (*field_sqr)(const EC_GROUP *, BIGNUM *, const BIGNUM *, BN_CTX *);
+	BN_CTX *new_ctx = NULL;
+	BIGNUM *tmp1, *tmp2, *Za23, *Zb23;
+	const BIGNUM *tmp1_, *tmp2_;
+	int ret = -1;
+	
+	if (EC_POINT_is_at_infinity(group, a))
+	{
+		return EC_POINT_is_at_infinity(group, b) ? 0 : 1;
+	}
+	
+	if (EC_POINT_is_at_infinity(group, b))
+		return 1;
+	
+	if (a->Z_is_one && b->Z_is_one)
+	{
+		return ((BN_cmp(&a->X, &b->X) == 0) && BN_cmp(&a->Y, &b->Y) == 0) ? 0 : 1;
+	}
+	
+	field_mul = group->meth->field_mul;
+	field_sqr = group->meth->field_sqr;
+	
+	if (ctx == NULL)
+	{
+		ctx = new_ctx = BN_CTX_new();
+		if (ctx == NULL)
+			return -1;
+	}
+	
+	return 1;
+	
+}
+
+/* file: ec_GFp_simple_add : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_add(const EC_GROUP *group, EC_POINT *r, const EC_POINT *a, const EC_POINT *b, BN_CTX *ctx)
+{
+	int (*field_mul)(const EC_GROUP *, BIGNUM *, const BIGNUM *, const BIGNUM *, BN_CTX *);
+	int (*field_sqr)(const EC_GROUP *, BIGNUM *, const BIGNUM *, BN_CTX *);
+	const BIGNUM *p;
+	BN_CTX *new_ctx = NULL;
+	BIGNUM *n0, *n1, *n2, *n3, *n4, *n5, *n6;
+	int ret = 0;
+	
+	if (a == b)
+		return EC_POINT_dbl(group, r, a, ctx);
+	if (EC_POINT_is_at_infinity(group, a))
+		return EC_POINT_copy(r, b);
+	if (EC_POINT_is_at_infinity(group, b))
+		return EC_POINT_copy(r, a);
+	
+	field_mul = group->meth->field_mul;
+	field_sqr = group->meth->field_sqr;
+	p = &group->field;
+	
+	if (ctx == NULL)
+	{
+		ctx = new_ctx = BN_CTX_new();
+		if (ctx == NULL)
+			return 0;
+	}
+	
+	return 1;
+}
+
+/* file: ec_GFp_nist_group_set_curve : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_nist.c */
+int ec_GFp_nist_group_set_curve(EC_GROUP *group, const BIGNUM *p,
+								const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx)
+{
+	int ret = 0;
+	BN_CTX *new_ctx = NULL;
+	BIGNUM *tmp_bn;
+	
+	if (ctx == NULL)
+		if ((ctx = new_ctx = BN_CTX_new()) == NULL) return 0;
+	
+	BN_CTX_start(ctx);
+	if ((tmp_bn = BN_CTX_get(ctx)) == NULL) goto err;
+	
+	/*if (BN_ucmp(BN_get0_nist_prime_192(), p) == 0)
+		group->field_mod_func = BN_nist_mod_192;
+	else if (BN_ucmp(BN_get0_nist_prime_224(), p) == 0)
+		group->field_mod_func = BN_nist_mod_224;
+	else if (BN_ucmp(BN_get0_nist_prime_256(), p) == 0)
+		group->field_mod_func = BN_nist_mod_256;
+	else if (BN_ucmp(BN_get0_nist_prime_384(), p) == 0)
+		group->field_mod_func = BN_nist_mod_384;
+	else if (BN_ucmp(BN_get0_nist_prime_521(), p) == 0)
+		group->field_mod_func = BN_nist_mod_521;
+	else
+	{
+		ECerr(EC_F_EC_GFP_NIST_GROUP_SET_CURVE, EC_R_NOT_A_NIST_PRIME);
+		goto err;
+	}*/
+	
+	ret = ec_GFp_simple_group_set_curve(group, p, a, b, ctx);
+	
+err:
+	BN_CTX_end(ctx);
+	if (new_ctx != NULL)
+		BN_CTX_free(new_ctx);
+	return ret;
+}
+
+/* file: ec_GFp_simple_group_set_curve : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_smpl.c */
+int ec_GFp_simple_group_set_curve(EC_GROUP *group,
+								  const BIGNUM *p, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx)
+{
+	int ret = 0;
+	BN_CTX *new_ctx = NULL;
+	BIGNUM *tmp_a;
+	
+	/* p must be a prime > 3 */
+	if (BN_num_bits(p) <= 2 || !BN_is_odd(p))
+	{
+		//ECerr(EC_F_EC_GFP_SIMPLE_GROUP_SET_CURVE, EC_R_INVALID_FIELD);
+		return 0;
+	}
+	
+	if (ctx == NULL)
+	{
+		ctx = new_ctx = BN_CTX_new();
+		if (ctx == NULL)
+			return 0;
+	}
+	
+	return 1;
+	
+}
+
+/* file: ec_GFp_nist_field_sqr : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_nist.c */
+int ec_GFp_nist_field_sqr(const EC_GROUP *group, BIGNUM *r, const BIGNUM *a,
+						  BN_CTX *ctx)
+{
+	int	ret=0;
+	BN_CTX	*ctx_new=NULL;
+	
+	if (!group || !r || !a)
+	{
+		//ECerr(EC_F_EC_GFP_NIST_FIELD_SQR, EC_R_PASSED_NULL_PARAMETER);
+		//goto err;
+	}
+	if (!ctx)
+		if ((ctx_new = ctx = BN_CTX_new()) == NULL) goto err;
+	
+	/*if (!BN_sqr(r, a, ctx)) goto err;
+	if (!group->field_mod_func(r, r, &group->field, ctx))
+		goto err;*/
+	
+	ret=1;
+err:
+	if (ctx_new)
+		BN_CTX_free(ctx_new);
+	return ret;
+}
+
+/* file: ec_GFp_nist_field_mul : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_nist.c */
+int ec_GFp_nist_field_mul(const EC_GROUP *group, BIGNUM *r, const BIGNUM *a,
+						  const BIGNUM *b, BN_CTX *ctx)
+{
+	int	ret=0;
+	BN_CTX	*ctx_new=NULL;
+	
+	if (!group || !r || !a || !b)
+	{
+		//ECerr(EC_F_EC_GFP_NIST_FIELD_MUL, ERR_R_PASSED_NULL_PARAMETER);
+		//goto err;
+	}
+	if (!ctx)
+		if ((ctx_new = ctx = BN_CTX_new()) == NULL) goto err;
+	
+	//if (!BN_mul(r, a, b, ctx)) goto err;
+	//if (!group->field_mod_func(r, r, &group->field, ctx))
+		//goto err;
+	
+	ret=1;
+err:
+	if (ctx_new)
+		BN_CTX_free(ctx_new);
+	return ret;
+}
+
+/* file: ec_GFp_nist_group_copy : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ececp_nist.c */
+int ec_GFp_nist_group_copy(EC_GROUP *dest, const EC_GROUP *src)
+{
+	//dest->field_mod_func = src->field_mod_func;
+	
+	return ec_GFp_simple_group_copy(dest, src);
+}
+
+/* file: cpy_utf8 : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c */
+static int cpy_utf8(unsigned long value, void *arg)
+{
+	unsigned char **p;
+	int ret;
+	p = arg;
+	/* We already know there is enough room so pass 0xff as the length */
+	ret = UTF8_putc(*p, 0xff, value);
+	*p += ret;
+	return 1;
+}
+
+/* file: cpy_univ : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c */
+static int cpy_univ(unsigned long value, void *arg)
+{
+	unsigned char **p, *q;
+	p = arg;
+	q = *p;
+	*q++ = (unsigned char) ((value >> 24) & 0xff);
+	*q++ = (unsigned char) ((value >> 16) & 0xff);
+	*q++ = (unsigned char) ((value >> 8) & 0xff);
+	*q = (unsigned char) (value & 0xff);
+	*p += 4;
+	return 1;
+}
+
+/* file: cpy_asc : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c */
+static int cpy_asc(unsigned long value, void *arg)
+{
+	unsigned char **p, *q;
+	p = arg;
+	q = *p;
+	*q = (unsigned char) value;
+	(*p)++;
+	return 1;
+}
+
+/* file: cpy_bmp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_mbstr.c */
+static int cpy_bmp(unsigned long value, void *arg)
+{
+	unsigned char **p, *q;
+	p = arg;
+	q = *p;
+	*q++ = (unsigned char) ((value >> 8) & 0xff);
+	*q = (unsigned char) (value & 0xff);
+	*p += 2;
+	return 1;
+}
+
+static void
+doapr_outch(
+			char **sbuffer,
+			char **buffer,
+			size_t *currlen,
+			size_t *maxlen,
+			int c)
+{
+    /* If we haven't at least one buffer, someone has doe a big booboo */
+    assert(*sbuffer != NULL || buffer != NULL);
+	
+    if (buffer) {
+		while (*currlen >= *maxlen) {
+			if (*buffer == NULL) {
+				if (*maxlen == 0)
+					*maxlen = 1024;
+				*buffer = OPENSSL_malloc(*maxlen);
+				if (*currlen > 0) {
+					assert(*sbuffer != NULL);
+					memcpy(*buffer, *sbuffer, *currlen);
+				}
+				*sbuffer = NULL;
+			} else {
+				*maxlen += 1024;
+				*buffer = OPENSSL_realloc(*buffer, *maxlen);
+			}
+		}
+		/* What to do if *buffer is NULL? */
+		assert(*sbuffer != NULL || *buffer != NULL);
+    }
+	
+    if (*currlen < *maxlen) {
+		if (*sbuffer)
+			(*sbuffer)[(*currlen)++] = (char)c;
+		else
+			(*buffer)[(*currlen)++] = (char)c;
+    }
+	
+    return;
+}
+
+
+/* file: bitstr_cb : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1asn1_gen.c */
+static int bitstr_cb(const char *elem, int len, void *bitstr)
+{
+	long bitnum;
+	char *eptr;
+	if (!elem)
+		return 0;
+	bitnum = strtoul(elem, &eptr, 10);
+	if (eptr && *eptr && (eptr != elem + len))
+		return 0;
+	if (bitnum < 0)
+	{
+		ASN1err(ASN1_F_BITSTR_CB, ASN1_R_INVALID_NUMBER);
+		return 0;
+	}
+	if (!ASN1_BIT_STRING_set_bit(bitstr, bitnum, 1))
+	{
+		ASN1err(ASN1_F_BITSTR_CB, ERR_R_MALLOC_FAILURE);
+		return 0;
+	}
+	return 1;
+}
+
+int UTF8_putc(unsigned char *str, int len, unsigned long value)
+{
+	if(!str) len = 6;	/* Maximum we will need */
+	else if(len <= 0) return -1;
+	if(value < 0x80) {
+		if(str) *str = (unsigned char)value;
+		return 1;
+	}
+	if(value < 0x800) {
+		if(len < 2) return -1;
+		if(str) {
+			*str++ = (unsigned char)(((value >> 6) & 0x1f) | 0xc0);
+			*str = (unsigned char)((value & 0x3f) | 0x80);
+		}
+		return 2;
+	}
+	if(value < 0x10000) {
+		if(len < 3) return -1;
+		if(str) {
+			*str++ = (unsigned char)(((value >> 12) & 0xf) | 0xe0);
+			*str++ = (unsigned char)(((value >> 6) & 0x3f) | 0x80);
+			*str = (unsigned char)((value & 0x3f) | 0x80);
+		}
+		return 3;
+	}
+	if(value < 0x200000) {
+		if(len < 4) return -1;
+		if(str) {
+			*str++ = (unsigned char)(((value >> 18) & 0x7) | 0xf0);
+			*str++ = (unsigned char)(((value >> 12) & 0x3f) | 0x80);
+			*str++ = (unsigned char)(((value >> 6) & 0x3f) | 0x80);
+			*str = (unsigned char)((value & 0x3f) | 0x80);
+		}
+		return 4;
+	}
+	if(value < 0x4000000) {
+		if(len < 5) return -1;
+		if(str) {
+			*str++ = (unsigned char)(((value >> 24) & 0x3) | 0xf8);
+			*str++ = (unsigned char)(((value >> 18) & 0x3f) | 0x80);
+			*str++ = (unsigned char)(((value >> 12) & 0x3f) | 0x80);
+			*str++ = (unsigned char)(((value >> 6) & 0x3f) | 0x80);
+			*str = (unsigned char)((value & 0x3f) | 0x80);
+		}
+		return 5;
+	}
+	if(len < 6) return -1;
+	if(str) {
+		*str++ = (unsigned char)(((value >> 30) & 0x1) | 0xfc);
+		*str++ = (unsigned char)(((value >> 24) & 0x3f) | 0x80);
+		*str++ = (unsigned char)(((value >> 18) & 0x3f) | 0x80);
+		*str++ = (unsigned char)(((value >> 12) & 0x3f) | 0x80);
+		*str++ = (unsigned char)(((value >> 6) & 0x3f) | 0x80);
+		*str = (unsigned char)((value & 0x3f) | 0x80);
+	}
+	return 6;
+}
+
+int UTF8_getc(const unsigned char *str, int len, unsigned long *val)
+{
+	const unsigned char *p;
+	unsigned long value;
+	int ret;
+	if(len <= 0) return 0;
+	p = str;
+	
+	/* Check syntax and work out the encoded value (if correct) */
+	if((*p & 0x80) == 0) {
+		value = *p++ & 0x7f;
+		ret = 1;
+	} else if((*p & 0xe0) == 0xc0) {
+		if(len < 2) return -1;
+		if((p[1] & 0xc0) != 0x80) return -3;
+		value = (*p++ & 0x1f) << 6;
+		value |= *p++ & 0x3f;
+		if(value < 0x80) return -4;
+		ret = 2;
+	} else if((*p & 0xf0) == 0xe0) {
+		if(len < 3) return -1;
+		if( ((p[1] & 0xc0) != 0x80)
+		   || ((p[2] & 0xc0) != 0x80) ) return -3;
+		value = (*p++ & 0xf) << 12;
+		value |= (*p++ & 0x3f) << 6;
+		value |= *p++ & 0x3f;
+		if(value < 0x800) return -4;
+		ret = 3;
+	} else if((*p & 0xf8) == 0xf0) {
+		if(len < 4) return -1;
+		if( ((p[1] & 0xc0) != 0x80)
+		   || ((p[2] & 0xc0) != 0x80) 
+		   || ((p[3] & 0xc0) != 0x80) ) return -3;
+		value = ((unsigned long)(*p++ & 0x7)) << 18;
+		value |= (*p++ & 0x3f) << 12;
+		value |= (*p++ & 0x3f) << 6;
+		value |= *p++ & 0x3f;
+		if(value < 0x10000) return -4;
+		ret = 4;
+	} else if((*p & 0xfc) == 0xf8) {
+		if(len < 5) return -1;
+		if( ((p[1] & 0xc0) != 0x80)
+		   || ((p[2] & 0xc0) != 0x80) 
+		   || ((p[3] & 0xc0) != 0x80) 
+		   || ((p[4] & 0xc0) != 0x80) ) return -3;
+		value = ((unsigned long)(*p++ & 0x3)) << 24;
+		value |= ((unsigned long)(*p++ & 0x3f)) << 18;
+		value |= ((unsigned long)(*p++ & 0x3f)) << 12;
+		value |= (*p++ & 0x3f) << 6;
+		value |= *p++ & 0x3f;
+		if(value < 0x200000) return -4;
+		ret = 5;
+	} else if((*p & 0xfe) == 0xfc) {
+		if(len < 6) return -1;
+		if( ((p[1] & 0xc0) != 0x80)
+		   || ((p[2] & 0xc0) != 0x80) 
+		   || ((p[3] & 0xc0) != 0x80) 
+		   || ((p[4] & 0xc0) != 0x80) 
+		   || ((p[5] & 0xc0) != 0x80) ) return -3;
+		value = ((unsigned long)(*p++ & 0x1)) << 30;
+		value |= ((unsigned long)(*p++ & 0x3f)) << 24;
+		value |= ((unsigned long)(*p++ & 0x3f)) << 18;
+		value |= ((unsigned long)(*p++ & 0x3f)) << 12;
+		value |= (*p++ & 0x3f) << 6;
+		value |= *p++ & 0x3f;
+		if(value < 0x4000000) return -4;
+		ret = 6;
+	} else return -2;
+	*val = value;
+	return ret;
+}
+
+/* file: RAND_add : /Volumes/work/Phd/ECDH/kv_openssl/crypto/randrand_lib.c */
+void RAND_add(const void *buf, size_t num, double entropy)
+{
+	const RAND_METHOD *meth = RAND_get_rand_method();
+	//if (meth && meth->add)
+	//	meth->add(buf,num,entropy);
+}
+
+/* file: RAND_bytes : /Volumes/work/Phd/ECDH/kv_openssl/crypto/randrand_lib.c */
+int RAND_bytes(unsigned char *buf, int num)
+{
+	const RAND_METHOD *meth = RAND_get_rand_method();
+	//if (meth && meth->bytes)
+	//	return meth->bytes(buf,num);
+	return(-1);
+}
+
+/* file: EC_POINT_is_at_infinity : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_lib.c */
+int EC_POINT_is_at_infinity(const EC_GROUP *group, const EC_POINT *point)
+{
+	if (group->meth->is_at_infinity == 0)
+	{
+		//ECerr(EC_F_EC_POINT_IS_AT_INFINITY, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED); FixMe
+		return 0;
+	}
+	if (group->meth != point->meth)
+	{
+		//ECerr(EC_F_EC_POINT_IS_AT_INFINITY, EC_R_INCOMPATIBLE_OBJECTS);
+		return 0;
+	}
+	return group->meth->is_at_infinity(group, point);
+}
+
+/* file: EC_POINT_get_affine_coordinates_GFp : /Volumes/work/Phd/ECDH/kv_openssl/crypto/ecec_lib.c */
+int EC_POINT_get_affine_coordinates_GFp(const EC_GROUP *group, const EC_POINT *point,
+										BIGNUM *x, BIGNUM *y, BN_CTX *ctx)
+{
+	if (group->meth->point_get_affine_coordinates == 0)
+	{
+		//ECerr(EC_F_EC_POINT_GET_AFFINE_COORDINATES_GFP, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
+		return 0;
+	}
+	if (group->meth != point->meth)
+	{
+		//ECerr(EC_F_EC_POINT_GET_AFFINE_COORDINATES_GFP, EC_R_INCOMPATIBLE_OBJECTS);
+		return 0;
+	}
+	return group->meth->point_get_affine_coordinates(group, point, x, y, ctx);
+}
+
+
+/* BN_mod_inverse_no_branch is a special version of BN_mod_inverse. 
+ * It does not contain branches that may leak sensitive information.
+ */
+static BIGNUM *BN_mod_inverse_no_branch(BIGNUM *in,
+										const BIGNUM *a, const BIGNUM *n, BN_CTX *ctx)
+{
+	BIGNUM *A,*B,*X,*Y,*M,*D,*T,*R=NULL;
+	BIGNUM local_A, local_B;
+	BIGNUM *pA, *pB;
+	BIGNUM *ret=NULL;
+	int sign;
+	
+	bn_check_top(a);
+	bn_check_top(n);
+	
+	BN_CTX_start(ctx);
+	A = BN_CTX_get(ctx);
+	B = BN_CTX_get(ctx);
+	X = BN_CTX_get(ctx);
+	D = BN_CTX_get(ctx);
+	M = BN_CTX_get(ctx);
+	Y = BN_CTX_get(ctx);
+	T = BN_CTX_get(ctx);
+	
+	return NULL;
+	
+}
+
+int BN_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *divisor,
+		   BN_CTX *ctx)
+{
+	int norm_shift,i,loop;
+	BIGNUM *tmp,wnum,*snum,*sdiv,*res;
+	BN_ULONG *resp,*wnump;
+	BN_ULONG d0,d1;
+	int num_n,div_n;
+	int no_branch=0;
+	
+	return 0;
+	
+}
+
+/* file: ASN1_BIT_STRING_set_bit : /Volumes/work/Phd/ECDH/kv_openssl/crypto/asn1a_bitstr.c */
+int ASN1_BIT_STRING_set_bit(ASN1_BIT_STRING *a, int n, int value)
+{
+	int w,v,iv;
+	unsigned char *c;
+	
+	w=n/8;
+	v=1<<(7-(n&0x07));
+	iv= ~v;
+	if (!value) v=0;
+	
+	if (a == NULL)
+		return 0;
+	
+	a->flags&= ~(ASN1_STRING_FLAG_BITS_LEFT|0x07); /* clear, set on write */
+	
+	if ((a->length < (w+1)) || (a->data == NULL))
+	{
+		if (!value) return(1); /* Don't need to set */
+		if (a->data == NULL)
+			c=(unsigned char *)OPENSSL_malloc(w+1);
+		//else
+			/*c=(unsigned char *)OPENSSL_realloc_clean(a->data,
+													 a->length,
+													 w+1); FixMe */
+		if (c == NULL)
+		{
+			ASN1err(ASN1_F_ASN1_BIT_STRING_SET_BIT,ERR_R_MALLOC_FAILURE);
+			return 0;
+		}
+  		if (w+1-a->length > 0) memset(c+a->length, 0, w+1-a->length);
+		a->data=c;
+		a->length=w+1;
+	}
+	a->data[w]=((a->data[w])&iv)|v;
+	while ((a->length > 0) && (a->data[a->length-1] == 0))
+		a->length--;
+	return(1);
+}
+
+/*int main(void){
+
+	int field_size;
+	unsigned char *secret;
+	size_t *secret_len;
+	
+	field_size = EC_GROUP_get_degree(EC_KEY_get0_group(key));  *secret_len = (field_size+7)/8;   	
+	if(NULL == (secret = OPENSSL_malloc(*secret_len))) handleErrors();   	
+	*secret_len = ECDH_compute_key(secret, *secret_len, EC_KEY_get0_public_key(secret),            key, NULL); 	
+	EC_KEY_free(key);    
+	if(*secret_len <= 0)  {   OPENSSL_free(secret);   return NULL; 	}
+	
+	return secret;
+}*/
+
